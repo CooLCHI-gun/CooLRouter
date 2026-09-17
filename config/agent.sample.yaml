@@ -1,0 +1,37 @@
+# Agent environment configuration — SHAPE ONLY, values redacted.
+# This is a curated sample of how the environment is structured.
+# Real deployments carry zero secrets; copy the shape, not the values.
+
+model:
+  default: <provider-agnostic-cloud-model>
+  provider: <cloud-endpoint-A>
+  fallback_providers:
+    - provider: <cloud-endpoint-B>
+      model: <fallback-model>
+
+agent:
+  max_turns: 60          # hard bail-out, never loop forever
+  gateway_timeout: 1800
+  api_max_retries: 3
+  tool_use_enforcement: auto
+  task_completion_guidance: true   # finish the job, not the description
+  environment_probe: true          # check the real system, not the profile
+
+router:
+  enabled: true
+  port: 8000
+  principle: local-first        # cheapest model that verifiably does the job
+  tier_0:
+    provider: local
+    engine: ollama
+    model: <small-on-device-model>
+    serve: simple tasks, classify, format, short edits
+  tier_1:
+    provider: remote
+    engine: cloud
+    model: <heavy-reasoning-model>
+    serve: deep reasoning, long context, vision
+
+privacy:
+  redact_pii: true          # never log raw arg/result content
+  no_screen_capture: true   # never record the user's own desktop

@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 914" font-family="'JetBrains Mono',monospace">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"/>
+    <polygon points="0 0, 8 4.5, 0 9" fill="#64748b"/>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"/>
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+  </defs>
+  <rect width="100%" height="100%" fill="#020617"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  <text x="44" y="52" fill="#f1f5f9" font-size="22" font-weight="700" text-anchor="start" letter-spacing="-0.5">CooLRouter — The Architecture of Deliberate Delegation</text>
+  <text x="44" y="76" fill="#94a3b8" font-size="12" font-weight="600" text-anchor="start">Where intuition is entrusted to a machine — and where it is not. Intent-guided 6-tier routing.</text>
+  <rect x="44" y="150" width="200" height="70" rx="10" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="144.0" y="183.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">User Request</text>
+  <text x="144.0" y="205.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">chat / CLI / cron</text>
+  <rect x="344" y="150" width="200" height="70" rx="10" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="444.0" y="183.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier Router</text>
+  <text x="444.0" y="205.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">intent-guided · local-first</text>
+  <rect x="60" y="300" width="130" height="104" rx="10" fill="rgba(6,78,59,0.35)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="125.0" y="336.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier 0 · Local</text>
+  <text x="125.0" y="358.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">on-device · $0</text>
+  <text x="125.0" y="376.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">private</text>
+  <rect x="206" y="300" width="130" height="104" rx="10" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="271.0" y="336.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier 1 · Cloud</text>
+  <text x="271.0" y="358.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">frontier · metered</text>
+  <text x="271.0" y="376.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">reasoning</text>
+  <rect x="352" y="300" width="130" height="104" rx="10" fill="rgba(59,7,100,0.35)" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="417.0" y="336.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier 2 · Research</text>
+  <text x="417.0" y="358.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">RAG · citations</text>
+  <text x="417.0" y="376.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">grounded</text>
+  <rect x="498" y="300" width="130" height="104" rx="10" fill="rgba(190,24,60,0.35)" stroke="#f472b6" stroke-width="1.5"/>
+  <text x="563.0" y="336.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier 3 · Trend</text>
+  <text x="563.0" y="358.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">real-time · web</text>
+  <text x="563.0" y="376.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">fresh</text>
+  <rect x="644" y="300" width="130" height="104" rx="10" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="709.0" y="336.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier 4 · Agentic</text>
+  <text x="709.0" y="358.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">autonomous · multi-step</text>
+  <text x="709.0" y="376.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">orchestration</text>
+  <rect x="790" y="300" width="130" height="104" rx="10" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="855.0" y="336.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tier 5 · Critique</text>
+  <text x="855.0" y="358.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">self-eval · review</text>
+  <text x="855.0" y="376.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">guardrail</text>
+  <rect x="60" y="452" width="843" height="42" rx="10" fill="rgba(136,19,55,0.28)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5"/>
+  <text x="481.5" y="477.0" fill="#e2e8f0" font-size="11" font-weight="700" text-anchor="middle">Cognitive Guardrail: multimodal vision · triangulate 2+ sources · never trust self-report</text>
+  <rect x="60" y="530" width="843" height="86" rx="10" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="481.5" y="557.0" fill="#e2e8f0" font-size="16" font-weight="700" text-anchor="middle">Agent Runtime</text>
+  <text x="481.5" y="579.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">orchestrates skills · memory · npx/pip tools · cron · plugins</text>
+  <text x="481.5" y="597.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">verify-before-trust · fail-forward</text>
+  <rect x="60" y="672" width="260" height="112" rx="10" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="190.0" y="712.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Skill Library</text>
+  <text x="190.0" y="734.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">procedural memory</text>
+  <text x="190.0" y="752.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">loaded on relevance · patched</text>
+  <rect x="352" y="672" width="260" height="112" rx="10" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="482.0" y="712.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Tool Client</text>
+  <text x="482.0" y="734.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">MCP servers · npx / pip</text>
+  <text x="482.0" y="752.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">sandboxed install · scoped</text>
+  <rect x="644" y="672" width="260" height="112" rx="10" fill="rgba(6,78,59,0.35)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="774.0" y="712.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Persistent Memory</text>
+  <text x="774.0" y="734.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">durable facts only</text>
+  <text x="774.0" y="752.0" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">compressed when full</text>
+  <rect x="60" y="812" width="843" height="62" rx="10" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="481.5" y="841.0" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">Verified Output</text>
+  <text x="481.5" y="863.0" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">real artifact + tool output — never plausible prose</text>
+  <line x1="244" y1="185" x2="344" y2="185" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="444" y1="220" x2="444" y2="262" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="125.0" y1="262" x2="855.0" y2="262" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="125.0" y1="262" x2="125.0" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="271.0" y1="262" x2="271.0" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="417.0" y1="262" x2="417.0" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="563.0" y1="262" x2="563.0" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="709.0" y1="262" x2="709.0" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="855.0" y1="262" x2="855.0" y2="300" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="125.0" y1="404" x2="125.0" y2="530" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="271.0" y1="404" x2="271.0" y2="530" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="417.0" y1="404" x2="417.0" y2="530" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="563.0" y1="404" x2="563.0" y2="530" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="709.0" y1="404" x2="709.0" y2="530" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="855.0" y1="404" x2="855.0" y2="530" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path d="M 481.5 616 Q 335.75 616 335.75 672 Q 335.75 672 190.0 672" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path d="M 481.5 616 Q 481.75 616 481.75 672 Q 481.75 672 482.0 672" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path d="M 481.5 616 Q 627.75 616 627.75 672 Q 627.75 672 774.0 672" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path d="M 190.0 784 Q 190.0 784 190.0 812 Q 190.0 812 190.0 812" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path d="M 482.0 784 Q 482.0 784 482.0 812 Q 482.0 812 482.0 812" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path d="M 774.0 784 Q 774.0 784 774.0 812 Q 774.0 812 774.0 812" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="900" y="150" width="72" height="192" rx="8" fill="rgba(15,23,42,0.6)" stroke="#1e293b"/>
+  <text x="936" y="168" fill="#e2e8f0" font-size="10" font-weight="600" text-anchor="middle">Legend</text>
+  <rect x="912" y="182" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#34d399"/>
+  <text x="930" y="190" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Local</text>
+  <rect x="912" y="198" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#fbbf24"/>
+  <text x="930" y="206" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Cloud</text>
+  <rect x="912" y="214" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#c084fc"/>
+  <text x="930" y="222" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Research</text>
+  <rect x="912" y="230" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#f472b6"/>
+  <text x="930" y="238" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Trend</text>
+  <rect x="912" y="246" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#22d3ee"/>
+  <text x="930" y="254" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Agentic</text>
+  <rect x="912" y="262" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#a78bfa"/>
+  <text x="930" y="270" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Critique</text>
+  <rect x="912" y="278" width="12" height="9" rx="2" fill="rgba(15,23,42,0.6)" stroke="#94a3b8"/>
+  <text x="930" y="286" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="start">Ext</text>
+  <text x="44" y="904" fill="#475569" font-size="9" font-weight="600" text-anchor="start">Fail-forward: L1 retry tighter -&gt; L2 switch approach -&gt; L3 ask a human. Never believe a self-report; verify against the running system.</text>
+</svg>

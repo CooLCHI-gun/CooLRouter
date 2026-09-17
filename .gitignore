@@ -1,0 +1,9 @@
+*.log
+.DS_Store
+*.bak
+assets/_gen_og.py
+assets/_gen_arch.py
+assets/_gen_demo.py
+assets/_gen_social.py
+assets/_gen_tier_gif.py
+assets/_logo_preview.html
