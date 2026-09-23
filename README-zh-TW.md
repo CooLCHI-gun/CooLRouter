@@ -30,7 +30,7 @@
 </p>
 
 <p align="center">
-  <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#型別化決策jev">Jev</a> · <a href="#防護機制">防護機制</a> · <a href="#部署">部署</a> · <a href="#目錄結構">目錄結構</a> · <a href="#限制說明">限制</a>
+  <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#型別化決策jev">Jev</a> · <a href="#防護機制">防護機制</a> · <a href="#部署">部署</a> · <a href="#目錄結構">目錄結構</a> · <a href="#實測數據">實測</a> · <a href="#限制說明">限制</a>
 </p>
 
 > **能以最低成本完成任務、且經得起驗證的模型，就是正確的模型。**
@@ -138,6 +138,15 @@
 
 ```sh
 cp deploy/.env.example .env     # 只填入你實際持有的 key
+最快看到它跑起來的方式 — 無需 clone、無需 virtualenv、也無需預裝 Python（`uv` 會在機器沒有 Python
+時自行安裝）：
+
+```bash
+uv run https://raw.githubusercontent.com/CooLCHI-gun/CooLRouter/main/router/router-proxy.py 8000
+```
+
+要永久安裝為服務：
+
 sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.ps1）
 ```
 
@@ -163,6 +172,33 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 ```
 
 動畫素材皆為程式生成：`demo-routing.gif`（20 幀、12.4 秒，示範一個任務走過 decide → dispatch → deliver）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
+
+## 實測數據
+
+以下數字全部來自 `logs/router-trace.jsonl`（路由器每個請求寫一行），可用
+`python router/router-stats.py <trace>` 重現。樣本為 26 小時開發流量共 284 筆，其中大部分是刻意製造的
+（`source=explicit` 佔 58%），因此應該理解為「路由器行為的描述」，而非生產環境工作量。
+
+| | 請求數 | 佔比 |
+|:--|--:|--:|
+| local | 147 | 51.8% |
+| cloud（flash / vision / meta） | 116 | 40.8% |
+| research | 21 | 7.4% |
+
+**成本中心是 research tier，不是 token。** 整個樣本的雲端 input token 花費為 $0.000556；而 21 次
+research 呼叫每次都有 $0.005–$0.014 的 search floor，合計 **$0.105–$0.294**，是全部 token 帳單的
+200–500 倍。真正影響支出的是「用 guard 擋住 research」，而不是壓縮 token。
+
+**local 的中位數並不比雲端慢，只是更不穩定。** `gemma3:4b` 中位數 1.86 秒，雲端 flash 為 1.99 秒；
+但 p90 是 15.6 秒對 6.7 秒 — 尾部來自模型載入，而非推理。本地 **vision** 是誠實的例外：
+Qwen3-VL-4B 中位數 18.9 秒，雲端 vision 模型 1.75 秒，慢 11 倍。本地 vision 是私隱功能，不是速度功能。
+
+**此樣本中主要 leg 從未失敗**：116/116 次雲端請求都由第一條 leg 完成，零 fallback、零空回答。
+分類器中位數 79 毫秒。
+
+**此樣本無法證明的事**：prefix cache 節省。每一行的 `cached_tokens` 都是 0，所以 tier 文件所記載的
+50× cache 折扣在這裡是設計性質，而非觀測結果。留在本機省下的金額真實但很小（$0.0024）；
+local tier 的價值在於延遲、私隱與不依賴網路，而不是 token 帳單。
 
 ## 限制說明
 

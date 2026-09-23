@@ -33,7 +33,7 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 </p>
 
 <p align="center">
-  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#typed-decisions-jev">Typed decisions</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#limitations">Limitations</a>
+  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#typed-decisions-jev">Typed decisions</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#measured">Measured</a> · <a href="#limitations">Limitations</a>
 </p>
 
 > **The cheapest model that verifiably does the job is the right model.**
@@ -179,6 +179,15 @@ Each arrangement substitutes a shinier alternative — declined, usually for cos
 
 ```sh
 cp deploy/.env.example .env     # add only the keys you actually have
+The fastest way to see it run - no clone, no virtualenv, no Python prerequisite (`uv` installs a
+Python if the machine has none):
+
+```bash
+uv run https://raw.githubusercontent.com/CooLCHI-gun/CooLRouter/main/router/router-proxy.py 8000
+```
+
+For a permanent install as a service:
+
 sh deploy/install.sh            # Linux / macOS   (./deploy/install.ps1 on Windows)
 ```
 
@@ -206,6 +215,38 @@ The animated assets are generated: `demo-routing.gif` (20 frames, 12.4s — one 
 decide → dispatch → deliver), `social.mp4` (7s loop), `promo.mp4` (12s Remotion cinematic),
 `architecture.svg` (6-tier diagram). Their generators live in `assets/_gen_*.py` and are
 gitignored — the source for `promo.mp4` is the full Remotion project under `promo/`.
+
+## Measured
+
+Every number below comes from `logs/router-trace.jsonl` (the router writes one line per request) and
+can be reproduced with `python router/router-stats.py <trace>`. The sample is 284 requests over 26
+hours of development traffic, and most of it is deliberately synthetic (`source=explicit`, 58%), so
+read it as a description of **how the router behaves** - not as a production workload.
+
+| | requests | share |
+|:--|--:|--:|
+| local | 147 | 51.8% |
+| cloud (flash / vision / meta) | 116 | 40.8% |
+| research | 21 | 7.4% |
+
+**The cost centre is the research tier, not tokens.** Cloud token spend for the whole sample was
+$0.000556 of input, while the 21 research calls each carry a per-call search floor of $0.005-$0.014,
+i.e. **$0.105-$0.294**. That is 200-500x the entire token bill. Gating research behind guards is what
+moves money; shaving tokens does not.
+
+**Local is not slower than cloud in the median - it is just less predictable.** `gemma3:4b` answered
+in 1.86 s median against 1.99 s for the cloud flash leg, but its p90 is 15.6 s versus 6.7 s: that
+tail is model loading, not inference. Local *vision* is the honest exception - 18.9 s median for
+Qwen3-VL-4B against 1.75 s for the cloud vision model, 11x slower. Local vision is a privacy feature,
+not a speed feature.
+
+**The primary leg never failed in this sample**: 116 of 116 cloud requests were served by the first
+leg, with zero fallbacks and zero empty completions. The classifier costs 79 ms median.
+
+**What this sample does not show**: prefix-cache savings. `cached_tokens` is 0 on every row, so the
+50x cache discount recorded in the tier notes is a design property here, not an observation. The
+dollar saving from staying local is real but small in this sample ($0.0024 of avoided input); the
+case for the local tier is latency, privacy and not needing the network - not the token bill.
 
 ## Limitations
 
