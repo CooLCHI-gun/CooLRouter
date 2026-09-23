@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" role="img" aria-label="CooLRouter Decision Chain">
+<title>CooLRouter Decision Chain</title>
+<defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0, 8 4.5, 0 9" fill="#64748b"/></marker><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern></defs>
+<rect width="1200" height="760" fill="#020617"/>
+<rect width="1200" height="760" fill="url(#grid)"/>
+<text x="40" y="46" fill="#f1f5f9" font-size="22" font-weight="700" letter-spacing="-0.5">CooLRouter Decision Chain</text>
+<text x="40" y="70" fill="#94a3b8" font-size="12" font-weight="600">127.0.0.1:8000 OpenAI-compatible - one tier per request</text>
+<g id="band_classify"><rect x="20" y="90" width="1160" height="110" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1" stroke-dasharray="3 3"/><text x="32" y="106" fill="#475569" font-size="10" font-weight="700" letter-spacing="1.5">BAND 1 CLASSIFY</text></g>
+<g id="band_privacy"><rect x="20" y="210" width="1160" height="140" rx="8" fill="#1c0f16" stroke="#fb7185" stroke-width="1" stroke-dasharray="3 3"/><text x="32" y="226" fill="#fb7185" font-size="10" font-weight="700" letter-spacing="1.5">BAND 2 PRIVACY GUARD - HARD GATE</text></g>
+<g id="band_typed"><rect x="20" y="360" width="1160" height="140" rx="8" fill="#141227" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 3"/><text x="32" y="376" fill="#a78bfa" font-size="10" font-weight="700" letter-spacing="1.5">BAND 3 TYPED GUARDS</text></g>
+<g id="band_dispatch"><rect x="20" y="510" width="1160" height="140" rx="8" fill="#0a1a1e" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3 3"/><text x="32" y="526" fill="#22d3ee" font-size="10" font-weight="700" letter-spacing="1.5">BAND 4 DISPATCH + VRAM</text></g>
+<g id="band_emit"><rect x="20" y="660" width="1160" height="80" rx="8" fill="#0c1a14" stroke="#34d399" stroke-width="1" stroke-dasharray="3 3"/><text x="32" y="676" fill="#34d399" font-size="10" font-weight="700" letter-spacing="1.5">BAND 5 EMIT</text></g>
+<path d="M 240 145 L 260 145" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="260.0" y="141.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 460 145 L 480 145" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="480.0" y="141.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 580 175 L 580 210 L 150 210 L 150 240" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="150.0" y="206.0" fill="#64748b" font-size="9" text-anchor="middle">to guard</text>
+<path d="M 260 280 L 280 280" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="280.0" y="276.0" fill="#64748b" font-size="9" text-anchor="middle">private</text>
+<path d="M 500 280 L 520 280" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="520.0" y="276.0" fill="#64748b" font-size="9" text-anchor="middle">local</text>
+<path d="M 760 280 L 780 280" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="780.0" y="276.0" fill="#64748b" font-size="9" text-anchor="middle">check</text>
+<path d="M 1090 320 L 1090 372 L 140 372 L 140 385" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="140.0" y="368.0" fill="#64748b" font-size="9" text-anchor="middle">if clear</text>
+<path d="M 240 420 L 260 420" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="260.0" y="416.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 460 420 L 480 420" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah)" stroke-dasharray="5 4"/>
+<text x="480.0" y="416.0" fill="#64748b" font-size="9" text-anchor="middle">fallback</text>
+<path d="M 680 420 L 700 420" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="700.0" y="416.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 900 420 L 920 420" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="920.0" y="416.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 1020 455 L 1020 522 L 140 522 L 140 535" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="140.0" y="518.0" fill="#64748b" font-size="9" text-anchor="middle">to pin</text>
+<path d="M 240 570 L 260 570" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="260.0" y="566.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 460 570 L 480 570" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="480.0" y="566.0" fill="#64748b" font-size="9" text-anchor="middle">chain</text>
+<path d="M 680 570 L 700 570" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="700.0" y="566.0" fill="#64748b" font-size="9" text-anchor="middle">on fail</text>
+<path d="M 900 570 L 920 570" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="920.0" y="566.0" fill="#64748b" font-size="9" text-anchor="middle">guard</text>
+<path d="M 1020 605 L 1020 640 L 160 640 L 160 672" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="160.0" y="636.0" fill="#64748b" font-size="9" text-anchor="middle">to emit</text>
+<path d="M 280 700 L 300 700" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="300.0" y="696.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 540 700 L 560 700" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="560.0" y="696.0" fill="#64748b" font-size="9" text-anchor="middle">next</text>
+<path d="M 800 700 L 820 700" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+<text x="820.0" y="696.0" fill="#64748b" font-size="9" text-anchor="middle">done</text>
+<g id="parse"><rect x="40" y="115" width="200" height="60" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1.5"/><text x="140.0" y="149.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">1 PARSE+FLATTEN</text></g>
+<g id="classify"><rect x="260" y="115" width="200" height="60" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1.5"/><text x="360.0" y="149.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">2 ROUTE_QUERY</text></g>
+<g id="conf"><rect x="480" y="115" width="200" height="60" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1.5"/><text x="580.0" y="149.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">2 CONFIDENCE</text></g>
+<g id="tiernote"><rect x="700" y="115" width="220" height="60" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1.5"/><text x="810.0" y="149.0" fill="#94a3b8" font-size="12" font-weight="600" text-anchor="middle">TIERS: LOCAL/CLOUD</text></g>
+<g id="guard"><rect x="40" y="240" width="220" height="80" rx="8" fill="#1c0f16" stroke="#fb7185" stroke-width="1.5"/><text x="150.0" y="284.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">3 PRIVACY GUARD</text></g>
+<g id="forcelocal"><rect x="280" y="240" width="220" height="80" rx="8" fill="#1c0f16" stroke="#fb7185" stroke-width="1.5"/><text x="390.0" y="284.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">4 FORCE LOCAL 1.0</text></g>
+<g id="caller"><rect x="520" y="240" width="240" height="80" rx="8" fill="#1c0f16" stroke="#fb7185" stroke-width="1.5"/><text x="640.0" y="284.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">5 CALLER TIER HONOR</text></g>
+<g id="imgpriv"><rect x="780" y="240" width="220" height="80" rx="8" fill="#1c0f16" stroke="#fb7185" stroke-width="1.5"/><text x="890.0" y="284.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">IMG=PRIVATE</text></g>
+<g id="failclosed"><rect x="1020" y="240" width="140" height="80" rx="8" fill="#1c0f16" stroke="#fb7185" stroke-width="1.5"/><text x="1090.0" y="284.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">FAIL CLOSED</text></g>
+<g id="worldknow"><rect x="40" y="385" width="200" height="70" rx="8" fill="#141227" stroke="#a78bfa" stroke-width="1.5"/><text x="140.0" y="424.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">6 WORLD-KNOWLEDGE</text></g>
+<g id="citations"><rect x="260" y="385" width="200" height="70" rx="8" fill="#141227" stroke="#a78bfa" stroke-width="1.5"/><text x="360.0" y="424.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">6 NEEDS-CITATIONS</text></g>
+<g id="regexfb"><rect x="480" y="385" width="200" height="70" rx="8" fill="#141227" stroke="#a78bfa" stroke-width="1.5"/><text x="580.0" y="424.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">7 REGEX FALLBACK</text></g>
+<g id="research"><rect x="700" y="385" width="200" height="70" rx="8" fill="#141227" stroke="#a78bfa" stroke-width="1.5"/><text x="800.0" y="424.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">8 RESEARCH GATE</text></g>
+<g id="devtask"><rect x="920" y="385" width="200" height="70" rx="8" fill="#141227" stroke="#a78bfa" stroke-width="1.5"/><text x="1020.0" y="424.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">9 DEV-TASK GUARD</text></g>
+<g id="sessionpin"><rect x="40" y="535" width="200" height="70" rx="8" fill="#0a1a1e" stroke="#22d3ee" stroke-width="1.5"/><text x="140.0" y="574.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">10 SESSION PIN</text></g>
+<g id="dispatch"><rect x="260" y="535" width="200" height="70" rx="8" fill="#0a1a1e" stroke="#22d3ee" stroke-width="1.5"/><text x="360.0" y="574.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">11 DISPATCH+VRAM</text></g>
+<g id="defaultchain"><rect x="480" y="535" width="200" height="70" rx="8" fill="#0a1a1e" stroke="#22d3ee" stroke-width="1.5"/><text x="580.0" y="574.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">11 DEFAULT CHAIN</text></g>
+<g id="fail"><rect x="700" y="535" width="200" height="70" rx="8" fill="#0a1a1e" stroke="#fb7185" stroke-width="1.5"/><text x="800.0" y="574.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">12 FAIL 503/502</text></g>
+<g id="vram"><rect x="920" y="535" width="200" height="70" rx="8" fill="#0a1a1e" stroke="#22d3ee" stroke-width="1.5"/><text x="1020.0" y="574.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">VRAM PRESSURE</text></g>
+<g id="emit"><rect x="40" y="672" width="240" height="56" rx="8" fill="#0c1a14" stroke="#34d399" stroke-width="1.5"/><text x="160.0" y="704.0" fill="#f1f5f9" font-size="12" font-weight="600" text-anchor="middle">13 EMIT META+TRACE</text></g>
+<g id="pinupdate"><rect x="300" y="672" width="240" height="56" rx="8" fill="#0c1a14" stroke="#34d399" stroke-width="1.5"/><text x="420.0" y="704.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">PIN UPDATE+COUNT</text></g>
+<g id="counters"><rect x="560" y="672" width="240" height="56" rx="8" fill="#0c1a14" stroke="#34d399" stroke-width="1.5"/><text x="680.0" y="704.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">COUNTERS+TRACE LINE</text></g>
+<g id="onetier"><rect x="820" y="672" width="240" height="56" rx="8" fill="#0c1a14" stroke="#34d399" stroke-width="1.5"/><text x="940.0" y="704.0" fill="#e2e8f0" font-size="12" font-weight="600" text-anchor="middle">ONE TIER ONLY</text></g>
+<rect x="477" y="42" width="10" height="10" rx="2" fill="#34d399"/><text x="492" y="51" fill="#94a3b8" font-size="10">local runtime</text>
+<rect x="599" y="42" width="10" height="10" rx="2" fill="#22d3ee"/><text x="614" y="51" fill="#94a3b8" font-size="10">default chain</text>
+<rect x="721" y="42" width="10" height="10" rx="2" fill="#a78bfa"/><text x="736" y="51" fill="#94a3b8" font-size="10">vision / research</text>
+<rect x="868" y="42" width="10" height="10" rx="2" fill="#fbbf24"/><text x="883" y="51" fill="#94a3b8" font-size="10">cited search</text>
+<rect x="984" y="42" width="10" height="10" rx="2" fill="#fb7185"/><text x="999" y="51" fill="#94a3b8" font-size="10">blocked / fail closed</text>
+</svg>

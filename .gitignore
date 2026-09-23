@@ -7,3 +7,6 @@ assets/_gen_demo.py
 assets/_gen_social.py
 assets/_gen_tier_gif.py
 assets/_logo_preview.html
+assets/_gen_decision_chain.py
+assets/_gen_routing_gif.py
+assets/muse-spec.json

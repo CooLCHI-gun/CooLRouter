@@ -24,6 +24,10 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 </p>
 
 <p align="center">
+  <img src="assets/routing-flow.gif" alt="CooLRouter — one request travelling the decision chain, stopped at the privacy gate" width="720">
+</p>
+
+<p align="center">
   <img src="assets/architecture.svg" alt="CooLRouter — 6-tier architecture, intent-guided routing" width="900">
 </p>
 
@@ -85,6 +89,10 @@ needs to be *challenged* after it is produced.
 ```
 Request → Intention → Faculty → Guardrail → Execution → Corroboration → Output
 ```
+
+<p align="center">
+  <img src="assets/router-decision-chain.svg" alt="CooLRouter — the decision chain: classify, privacy gate, typed-decision guards, dispatch + VRAM, emit" width="900">
+</p>
 
 The routing core is published here: [`router/router-proxy.py`](router/router-proxy.py), documented
 in [`docs/router-architecture.md`](docs/router-architecture.md) — the architecture diagram, the

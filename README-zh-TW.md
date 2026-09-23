@@ -26,6 +26,10 @@
 </p>
 
 <p align="center">
+  <img src="assets/routing-flow.gif" alt="CooLRouter —— 一個請求走過決策鏈，並在 privacy gate 被攔下" width="720">
+</p>
+
+<p align="center">
   <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#防護機制">防護機制</a> · <a href="#目錄結構">目錄結構</a> · <a href="#限制說明">限制</a>
 </p>
 
@@ -61,6 +65,12 @@
 請求 → 意圖 → 能力等級 → 防護機制 → 執行 → 佐證 → 輸出
 ```
 
+<p align="center">
+  <img src="assets/router-decision-chain.svg" alt="CooLRouter 決策鏈：classify、privacy gate、typed-decision guards、dispatch + VRAM、emit" width="900">
+</p>
+
+路由核心的實作收錄於 [`router/router-proxy.py`](router/router-proxy.py)；完整的技術說明見 [`docs/router-architecture.md`](docs/router-architecture.md)——包含架構圖、13 階段決策鏈（含行號）、tier 表、回應契約、護欄一覽與已知缺陷清單。
+
 三個組件的權重高於任何單一模型：
 
 1. **意圖路由器** —— 在任何模型接觸請求之前，先根據請求內容決定「在哪裡處理」。成本控制是原則，而非事後對帳。
@@ -94,14 +104,15 @@
 .
 ├── assets/        架構圖 · 動畫演示 · 社交影片 · 標誌
 ├── config/        環境配置範例（數值已遮蔽，保留結構）
+├── router/        router-proxy.py —— 路由核心，附說明與測試
 ├── skills/        技能條目範例——呈現模式，非實際內容
-├── docs/          工作筆記 + LinkedIn 貼文草稿
+├── docs/          router-architecture.md（深入技術說明）· sonar review · 工作筆記
 ├── README.md      英文正本
 ├── README-zh-TW.md  本檔（繁體中文導讀）
 └── LICENSE        MIT
 ```
 
-動畫素材皆為程式生成：`demo.gif`（終端員工作階段）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
+動畫素材皆為程式生成：`demo.gif`（終端員工作階段）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）、`routing-flow.gif`（8 幀路由流程動畫）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）。；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
 
 ## 限制說明
 
