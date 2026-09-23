@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 640" width="1150" height="640" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" role="img" aria-label="Prompt cache — hit rate past the block threshold">
+<title>Prompt cache — hit rate past the block threshold</title>
+<desc>cache hit rate against client prefix length, log scale</desc>
+<defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0, 8 4.5, 0 9" fill="#64748b"/></marker><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern></defs>
+<rect x="0" y="0" width="1150" height="640" fill="#020617"/>
+<rect x="0" y="0" width="1150" height="640" fill="url(#grid)"/>
+<text x="60" y="48" font-size="22" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#f1f5f9" font-weight="700" letter-spacing="-0.5">Prompt cache — hit rate past the block threshold</text>
+<text x="60" y="72" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">hit rate against client prefix length, log scale; measured through the proxy</text>
+<rect x="90" y="110" width="980" height="330" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+<path d="M 90 440.0 L 1070 440.0" stroke="#1e293b" stroke-width="0.8"/>
+<text x="78" y="444.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="end">0</text>
+<path d="M 90 357.5 L 1070 357.5" stroke="#1e293b" stroke-width="0.8"/>
+<text x="78" y="361.5" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="end">25</text>
+<path d="M 90 275.0 L 1070 275.0" stroke="#1e293b" stroke-width="0.8"/>
+<text x="78" y="279.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="end">50</text>
+<path d="M 90 192.5 L 1070 192.5" stroke="#1e293b" stroke-width="0.8"/>
+<text x="78" y="196.5" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="end">75</text>
+<path d="M 90 110.0 L 1070 110.0" stroke="#1e293b" stroke-width="0.8"/>
+<text x="78" y="114.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="end">100</text>
+<text x="78" y="98" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="end">hit %</text>
+<path d="M 90.0 110 L 90.0 440" stroke="#1e293b" stroke-width="0.8"/>
+<text x="90.0" y="462" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">128</text>
+<path d="M 286.00000000000006 110 L 286.00000000000006 440" stroke="#1e293b" stroke-width="0.8"/>
+<text x="286.00000000000006" y="462" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">256</text>
+<path d="M 482.0000000000001 110 L 482.0000000000001 440" stroke="#1e293b" stroke-width="0.8"/>
+<text x="482.0000000000001" y="462" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">512</text>
+<path d="M 678.0000000000001 110 L 678.0000000000001 440" stroke="#1e293b" stroke-width="0.8"/>
+<text x="678.0000000000001" y="462" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">1024</text>
+<path d="M 874.0000000000002 110 L 874.0000000000002 440" stroke="#1e293b" stroke-width="0.8"/>
+<text x="874.0000000000002" y="462" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">2048</text>
+<path d="M 1070.0 110 L 1070.0 440" stroke="#1e293b" stroke-width="0.8"/>
+<text x="1070.0" y="462" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">4096</text>
+<text x="580.0" y="486" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">client prefix tokens (log)</text>
+<path d="M 286.00000000000006 110 L 286.00000000000006 440" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="278.00000000000006" y="128" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#22d3ee" text-anchor="end">threshold ≈ 256 tokens</text>
+<circle cx="123.30530028269334" cy="440.0" r="4" fill="#64748b"/>
+<circle cx="258.1642750450042" cy="440.0" r="5" fill="#22d3ee"/>
+<circle cx="316.3443493742126" cy="143.0" r="5" fill="#22d3ee"/>
+<circle cx="442.97638038437987" cy="156.2" r="5" fill="#22d3ee"/>
+<circle cx="576.8278923437945" cy="146.3" r="4" fill="#64748b"/>
+<circle cx="649.8594036106041" cy="119.9" r="5" fill="#22d3ee"/>
+<circle cx="843.2546385778246" cy="116.60000000000001" r="5" fill="#22d3ee"/>
+<circle cx="873.1703615720493" cy="129.8" r="4" fill="#64748b"/>
+<circle cx="965.7505177301076" cy="111.97999999999996" r="4" fill="#64748b"/>
+<circle cx="1037.9432026229083" cy="116.60000000000001" r="5" fill="#22d3ee"/>
+<text x="123.30530028269334" y="414.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">0%</text>
+<text x="123.30530028269334" y="428.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">144</text>
+<text x="258.1642750450042" y="414.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">0%</text>
+<text x="258.1642750450042" y="428.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">232</text>
+<text x="316.3443493742126" y="163.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">90%</text>
+<text x="316.3443493742126" y="177.0" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">285</text>
+<text x="442.97638038437987" y="176.2" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">86%</text>
+<text x="442.97638038437987" y="190.2" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">446</text>
+<text x="576.8278923437945" y="166.3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">89%</text>
+<text x="576.8278923437945" y="180.3" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">716</text>
+<text x="649.8594036106041" y="139.9" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">97%</text>
+<text x="649.8594036106041" y="153.9" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">927</text>
+<text x="843.2546385778246" y="136.60000000000002" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">98%</text>
+<text x="843.2546385778246" y="150.60000000000002" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">1837</text>
+<text x="873.1703615720493" y="149.8" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">94%</text>
+<text x="873.1703615720493" y="163.8" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">2042</text>
+<text x="965.7505177301076" y="131.97999999999996" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">99.4%</text>
+<text x="965.7505177301076" y="145.97999999999996" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">2833</text>
+<text x="1037.9432026229083" y="136.60000000000002" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">98%</text>
+<text x="1037.9432026229083" y="150.60000000000002" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">3657</text>
+<text x="104" y="424" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">filled = probe rows   hollow ring = other runs</text>
+<rect x="60" y="470" width="1030" height="70" rx="12" fill="#0f172a" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="80" y="496" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0">$0.003 / M hit vs $0.15 / M miss — 50× cheaper input</text>
+<text x="80" y="518" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">at a 2042-token prefix: 0.0000241 vs 0.000306 per turn = 12.7× cheaper</text>
+<text x="80" y="536" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">cached counts are always multiples of 64 (block granularity)</text>
+<rect x="60" y="556" width="1030" height="62" rx="12" fill="#1e293b" stroke="#34d399" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="80" y="582" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#34d399">leg switch GO → ZEN → GO keeps 98 / 98 / 98 — same model id, cache survives failover</text>
+<text x="80" y="602" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">honest caveat: one 927-token run reported 0% and could not be reproduced (write race)</text>
+</svg>

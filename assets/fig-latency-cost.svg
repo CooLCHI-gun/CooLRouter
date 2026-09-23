@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 620" width="1150" height="620" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" role="img" aria-label="Latency, guards and cost on one page">
+<title>Latency, guards and cost on one page</title>
+<desc>medians and p90 in seconds, guard behaviour in per cent</desc>
+<defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><polygon points="0 0, 8 4.5, 0 9" fill="#64748b"/></marker><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern></defs>
+<rect x="0" y="0" width="1150" height="620" fill="#020617"/>
+<rect x="0" y="0" width="1150" height="620" fill="url(#grid)"/>
+<text x="60" y="48" font-size="22" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#f1f5f9" font-weight="700" letter-spacing="-0.5">Latency, guards and cost on one page</text>
+<text x="60" y="72" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">all figures in seconds unless marked; bars are medians, outlined bars are p90</text>
+<rect x="90" y="370" width="64" height="30" rx="4" fill="#34d399" stroke="#34d399" stroke-width="0"/>
+<text x="122" y="362" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">1.86</text>
+<text x="122" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">gemma3:4b</text>
+<text x="122" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">median</text>
+<rect x="220" y="150" width="64" height="250" rx="4" fill="none" stroke="#34d399" stroke-width="1.5"/>
+<text x="252" y="142" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">15.6</text>
+<text x="252" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">gemma3:4b</text>
+<text x="252" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">p90</text>
+<rect x="350" y="368" width="64" height="32" rx="4" fill="#22d3ee" stroke="#22d3ee" stroke-width="0"/>
+<text x="382" y="360" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">1.99</text>
+<text x="382" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">flash</text>
+<text x="382" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">median</text>
+<rect x="480" y="293" width="64" height="107" rx="4" fill="none" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="512" y="285" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">6.7</text>
+<text x="512" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">flash</text>
+<text x="512" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">p90</text>
+<rect x="610" y="381" width="64" height="19" rx="4" fill="#a78bfa" stroke="#a78bfa" stroke-width="0"/>
+<text x="642" y="373" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">1.19</text>
+<text x="642" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">zen vision</text>
+<text x="642" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">median</text>
+<rect x="740" y="396" width="64" height="4" rx="4" fill="#c084fc" stroke="#c084fc" stroke-width="0"/>
+<text x="772" y="388" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">0.06</text>
+<text x="772" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">vl4b warm</text>
+<text x="772" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">median</text>
+<rect x="870" y="266" width="64" height="134" rx="4" fill="none" stroke="#c084fc" stroke-width="1.5"/>
+<text x="902" y="258" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">8.34</text>
+<text x="902" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">vl4b cold</text>
+<text x="902" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">p90</text>
+<rect x="1000" y="342" width="64" height="58" rx="4" fill="#f472b6" stroke="#f472b6" stroke-width="0"/>
+<text x="1032" y="334" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" text-anchor="middle">3.62</text>
+<text x="1032" y="420" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8" text-anchor="middle">sonar-pro</text>
+<text x="1032" y="436" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b" text-anchor="middle">median</text>
+<path d="M 70 400 L 1090 400" stroke="#475569" stroke-width="1"/>
+<text x="70" y="134" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">seconds, 0 to 15.6</text>
+<rect x="60" y="440" width="1030" height="74" rx="12" fill="#0f172a" stroke="#34d399" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="80" y="466" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0">guards fire on 3% of requests — and they are arithmetic, not a model call</text>
+<text x="80" y="488" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">80 local requests, 61 pay for length classification; 13 forced local by privacy, 0 of them paid</text>
+<text x="80" y="506" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">local avoids the cloud bill entirely; the guard only ever moves traffic up</text>
+<rect x="60" y="528" width="1030" height="74" rx="12" fill="#1e293b" stroke="#f472b6" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="80" y="554" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0">the biggest lever is not tokens: research search floor 0.105 to 0.294 per call</text>
+<text x="80" y="576" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">that is 200 to 500 times the whole token bill of the sample — cache is the second lever</text>
+<text x="80" y="594" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">cache is a client-behaviour saving: long stable prefix + a proxy that does not rewrite it</text>
+</svg>

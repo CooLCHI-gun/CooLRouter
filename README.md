@@ -43,6 +43,11 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 > can do is rewrite the prefix it forwards - worth **25x** on a 3,657-token prompt. This one does not
 > touch it. See [The cache](#the-cache-is-where-the-money-is-measured).
 
+![CooLRouter — one request reaches exactly one tier, behind a fail-closed guard](assets/fig-routing.svg)
+
+*One request reaches exactly one of the six tiers, behind a fail-closed privacy guard, with the
+payload passed through untouched. Generated from this repository's own data — see `tools/gen-figures.py`.*
+
 ## Why CooLRouter
 
 The reflexive "one large model for everything" is seductive because it is simple. It is also
@@ -204,7 +209,10 @@ serves an agent through it. The response carries the routing decision in its bod
 
 ```
 .
-├── assets/        demo-routing.gif (3-act demo) · architecture.svg · router-decision-chain.svg · promo.mp4 · og-image.png
+├── assets/        logos, demo-routing.gif (3-act demo) · architecture.svg · router-decision-chain.svg
+│                  fig-routing.svg · fig-traffic.svg · fig-cache.svg · fig-latency-cost.svg (measured)
+│                  promo.mp4 · og-image.png
+├── tools/         gen-figures.py — regenerates the four measurement figures from their source data
 ├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes config + plugin
 ├── config/        environment config sample (values redacted, shape kept)
 ├── router/        router-proxy.py · router-cache-probe.py · router-stats.py — the routing core · router-conformance.py · test-router-p0.py
@@ -216,11 +224,19 @@ serves an agent through it. The response carries the routing decision in its bod
 ```
 
 The animated assets are generated: `demo-routing.gif` (20 frames, 12.4s — one task travelling
-decide → dispatch → deliver), `social.mp4` (7s loop), `promo.mp4` (12s Remotion cinematic),
-`architecture.svg` (6-tier diagram). Their generators live in `assets/_gen_*.py` and are
-gitignored — the source for `promo.mp4` is the full Remotion project under `promo/`.
+decide → dispatch → deliver), `promo.mp4` (12s Remotion cinematic), `architecture.svg` (6-tier
+diagram). The four measurement figures are regenerated from the numbers in `tools/gen-figures.py`
+(standard library only: `python tools/gen-figures.py`), so a reader can rebuild or refute them; the
+`assets/_gen_*.py` generators for the animation assets are gitignored. The source for `promo.mp4` is
+the full Remotion project under `promo/`.
 
 ## The cache is where the money is (measured)
+
+![Cache hit rate against client prefix length, log scale](assets/fig-cache.svg)
+
+*Cache hit rate against client prefix length (log scale). Filled markers are the probe rows in the
+table below; hollow rings are separate runs. The floor sits near 256 tokens, and every cached count
+is a multiple of 64 — block granularity.*
 
 The cloud legs bill input at **$0.15/M on a miss and $0.003/M on a hit** - a 50x gap - so the most
 expensive thing a router can do is make a prefix un-cacheable. Measured against the live legs with
@@ -257,6 +273,11 @@ returns `cache_write_tokens: null`, so write costs cannot be reported. Prices ar
 from the tier notes.
 
 ## Measured
+
+![Measured traffic — local 147, cloud 116, research 21 out of 284 traced requests](assets/fig-traffic.svg)
+
+*Where the 284 traced requests went. 58% of those rows are the author's own conformance traffic, so
+read the shape rather than the absolute split.*
 
 Every number below comes from `logs/router-trace.jsonl` (the router writes one line per request) and
 can be reproduced with `python router/router-stats.py <trace>`. The sample is 284 requests over 26
@@ -298,6 +319,11 @@ the token count. The router helps by not touching the messages it forwards: inje
 per-request into the prefix would destroy that discount for every client. The dollar saving from
 staying local is real but small in this sample ($0.0024 of avoided input); the case for the local
 tier is latency, privacy and not needing the network - not the token bill.
+
+![Latency medians and p90, guard behaviour, and the cost ledger on one page](assets/fig-latency-cost.svg)
+
+*Medians and p90 latencies, guard behaviour and the cost ledger, side by side. Note that the largest
+lever in this sample is not tokens at all — it is the per-call search floor on the research tier.*
 
 ## Limitations
 

@@ -42,6 +42,11 @@
 > **實測：input 在 cache miss 時貴 50 倍。** 一個 router 最貴嘅行為，就是改寫它轉發嘅 prefix —
 > 在 3,657-token prompt 上實測價值 **25 倍**。這個 router 不會動它。見 [成本核心在 cache](#成本核心在-cache實測)。
 
+![CooLRouter —— 單一請求只進入一個等級，並先經過 fail-closed 的守衛](assets/fig-routing.svg)
+
+*單一請求只進入六個等級中的一個，並先經過 fail-closed 的隱私守衛；payload 原樣通過，不被改寫。
+圖表由本 repo 自身數據生成，見 `tools/gen-figures.py`。*
+
 本專案基於三項信念：
 
 - **依意圖，而非依模型** —— 路由器根據「任務需要什麼能力」來分派，而不是根據已安裝什麼。
@@ -162,7 +167,10 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 
 ```
 .
-├── assets/        demo-routing.gif（三幕演示）· 架構圖 · 決策鏈圖 · 社交影片 · 標誌
+├── assets/        標誌 · demo-routing.gif（三幕演示）· 架構圖 · 決策鏈圖
+│                  fig-routing.svg · fig-traffic.svg · fig-cache.svg · fig-latency-cost.svg（實測圖表）
+│                  promo.mp4 · og-image.png
+├── tools/         gen-figures.py —— 由源數據重新生成四張實測圖表
 ├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes 設定與 plugin
 ├── config/        環境配置範例（數值已遮蔽，保留結構）
 ├── router/        router-proxy.py · router-cache-probe.py · router-stats.py —— 路由核心，附說明與測試
@@ -173,9 +181,14 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 └── LICENSE        MIT
 ```
 
-動畫素材皆為程式生成：`demo-routing.gif`（20 幀、12.4 秒，示範一個任務走過 decide → dispatch → deliver）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
+四張實測圖表由 `tools/gen-figures.py` 生成（僅用標準函式庫，`python tools/gen-figures.py` 即可重建或推翻）。動畫素材皆為程式生成：`demo-routing.gif`（20 幀、12.4 秒，示範一個任務走過 decide → dispatch → deliver）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
 
 ## 成本核心在 cache（實測）
+
+![Cache 命中率對 client prefix 長度（對數刻度）](assets/fig-cache.svg)
+
+*Cache 命中率對 client prefix 長度（對數刻度）。實心點為下方表格的 probe 數據，空心圈為其他獨立
+測量。門檻約在 256 tokens，且所有 cached 數值皆為 64 的倍數 —— 即 block 粒度。*
 
 雲端 leg 嘅 input 收費係 **miss $0.15/M、hit $0.003/M** — 相差 50 倍 — 所以一個 router 最貴嘅行為就係
 令 prefix 無法 cache。以下用 `python router/router-cache-probe.py` 對真實 leg 實測：
@@ -207,6 +220,10 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 價格採用 tier 文件所記錄嘅費率。
 
 ## 實測數據
+
+![實測流量分流：local 147、cloud 116、research 21（共 284 個追蹤請求）](assets/fig-traffic.svg)
+
+*284 個追蹤請求的分流結果。其中 58% 為作者自身的一致性測試流量，因此應看整體形狀，而非絕對比例。*
 
 以下數字全部來自 `logs/router-trace.jsonl`（路由器每個請求寫一行），可用
 `python router/router-stats.py <trace>` 重現。樣本為 26 小時開發流量共 284 筆，其中大部分是刻意製造的
@@ -242,6 +259,11 @@ input 便宜 **12.7 倍**（hit $0.003/M 對 miss $0.15/M）— 這才是真正�
 路由器在此有幫助，因為它不會改動轉發的 messages：任何 per-request 注入 prefix 的做法，都會毀掉所有
 客戶端的折扣。留在本機省下的金額真實但很小（$0.0024）；local tier 的價值在於延遲、私隱與不依賴網路，
 而不是 token 帳單。
+
+![延遲中位數與 p90、guard 行為、成本分佈並列](assets/fig-latency-cost.svg)
+
+*延遲中位數與 p90、guard 行為、以及成本分佈並列。樣本中最大的槓桿並非 token，而是 research 等級
+每次搜尋的下限成本。*
 
 ## 限制說明
 
