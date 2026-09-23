@@ -23,6 +23,8 @@ from collections import Counter, defaultdict
 MISS_PER_M = 0.15      # USD per 1M input tokens, cache miss
 HIT_PER_M = 0.003      # USD per 1M input tokens, cache hit
 SEARCH_FLOOR = (0.005, 0.014)   # USD per research call, low/high
+CACHE_MIN_PROMPT = 700          # measured 2026-09-23: a 144-token prompt never hit the cache,
+                                # 716 tokens hit 89% - so below this the hit rate is meaningless
 
 CLOUD_TIERS = {"flash", "vision", "meta"}
 LOCAL_TIERS = {"local"}
@@ -91,6 +93,30 @@ def main():
     print("  miss %d tok x $%.3f/M = $%.6f" % (pc - cc, MISS_PER_M, miss_cost))
     print("  hit  %d tok x $%.3f/M = $%.6f" % (cc, HIT_PER_M, hit_cost))
     print("  total $%.6f   (without the cache: $%.6f)" % (miss_cost + hit_cost, pc * MISS_PER_M / 1e6))
+    print()
+
+    print("PREFIX CACHE")
+    cacheable = [r for r in cloud if (r.get("prompt_tokens") or 0) >= CACHE_MIN_PROMPT]
+    short = [r for r in cloud if (r.get("prompt_tokens") or 0) < CACHE_MIN_PROMPT]
+    if not cacheable:
+        print("  no cloud request had a prompt of %d tokens or more, so none of them could be cached"
+              % CACHE_MIN_PROMPT)
+        print("  a 0%% hit rate here describes SHORT prompts, not broken caching. Measured on the same")
+        print("  leg: 144 tok -> 0%%, 716 tok -> 89%%, 2042 tok -> 94%%, 2833 tok -> 99.4%%")
+    else:
+        cp = sum(r.get("prompt_tokens") or 0 for r in cacheable)
+        ch = sum(r.get("cached_tokens") or 0 for r in cacheable)
+        print("  cacheable requests %d of %d (%d prompt tokens, %d cached -> %.1f%% hit)"
+              % (len(cacheable), len(cloud), cp, ch, 100.0 * ch / cp if cp else 0.0))
+        saved = ch * (MISS_PER_M - HIT_PER_M) / 1e6
+        print("  saved by the cache $%.6f; without it those tokens cost $%.6f"
+              % (saved, cp * MISS_PER_M / 1e6))
+        if ch:
+            ratio = (cp * MISS_PER_M) / (ch * HIT_PER_M + (cp - ch) * MISS_PER_M)
+            print("  input is %.1fx cheaper than sending the same prefix uncached" % ratio)
+    print("  %d requests were too short to cache (%d prompt tokens); the cache only pays off on a"
+          % (len(short), sum(r.get("prompt_tokens") or 0 for r in short)))
+    print("  repeated prefix, which is what an agent session has and a one-shot prompt does not")
     print()
 
     pl, _, _ = tokens(local)

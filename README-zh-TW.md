@@ -196,9 +196,13 @@ Qwen3-VL-4B 中位數 18.9 秒，雲端 vision 模型 1.75 秒，慢 11 倍。�
 **此樣本中主要 leg 從未失敗**：116/116 次雲端請求都由第一條 leg 完成，零 fallback、零空回答。
 分類器中位數 79 毫秒。
 
-**此樣本無法證明的事**：prefix cache 節省。每一行的 `cached_tokens` 都是 0，所以 tier 文件所記載的
-50× cache 折扣在這裡是設計性質，而非觀測結果。留在本機省下的金額真實但很小（$0.0024）；
-local tier 的價值在於延遲、私隱與不依賴網路，而不是 token 帳單。
+**Prefix cache 是有效的 — 只是這個樣本用不到。** 每一行 `cached_tokens` 都是 0，原因在於 prompt 長度：
+樣本內雲端請求平均只有 32 tokens，而 prefix 太短就永遠不會命中。同一條 leg 另行實測：144 tokens → 0%、
+716 tokens → 89%、2,042 tokens → 94%、2,833 tokens → 99.4%。在重複出現的 2,042-token prefix 上，cache 令
+input 便宜 **12.7 倍**（hit $0.003/M 對 miss $0.15/M）— 這才是真正省錢的地方，而不是 token 數量。
+路由器在此有幫助，因為它不會改動轉發的 messages：任何 per-request 注入 prefix 的做法，都會毀掉所有
+客戶端的折扣。留在本機省下的金額真實但很小（$0.0024）；local tier 的價值在於延遲、私隱與不依賴網路，
+而不是 token 帳單。
 
 ## 限制說明
 

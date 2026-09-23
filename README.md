@@ -243,10 +243,15 @@ not a speed feature.
 **The primary leg never failed in this sample**: 116 of 116 cloud requests were served by the first
 leg, with zero fallbacks and zero empty completions. The classifier costs 79 ms median.
 
-**What this sample does not show**: prefix-cache savings. `cached_tokens` is 0 on every row, so the
-50x cache discount recorded in the tier notes is a design property here, not an observation. The
-dollar saving from staying local is real but small in this sample ($0.0024 of avoided input); the
-case for the local tier is latency, privacy and not needing the network - not the token bill.
+**Prefix caching works - this sample simply could not use it.** Every row shows `cached_tokens` 0, and
+the reason is prompt length: cloud requests here averaged 32 tokens, and a short prefix never hits.
+Measured separately against the same leg: a 144-token prompt hit 0%, 716 tokens hit 89%, 2,042 tokens
+hit 94%, 2,833 tokens hit 99.4%. On a repeated 2,042-token prefix the cache makes input **12.7x
+cheaper** ($0.003/M on a hit against $0.15/M on a miss) - that is where the real saving lives, not in
+the token count. The router helps by not touching the messages it forwards: injecting anything
+per-request into the prefix would destroy that discount for every client. The dollar saving from
+staying local is real but small in this sample ($0.0024 of avoided input); the case for the local
+tier is latency, privacy and not needing the network - not the token bill.
 
 ## Limitations
 
