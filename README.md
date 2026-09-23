@@ -41,7 +41,7 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 >
 > **Measured: input costs 50x more on a cache miss than on a hit.** The most expensive thing a router
 > can do is rewrite the prefix it forwards - worth **25x** on a 3,657-token prompt. This one does not
-> touch it. See [The cache](#the-cache-is-where-the-money-is).
+> touch it. See [The cache](#the-cache-is-where-the-money-is-measured).
 
 ## Why CooLRouter
 
