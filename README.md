@@ -204,7 +204,7 @@ serves an agent through it. The response carries the routing decision in its bod
 
 ```
 .
-├── assets/        demo-routing.gif (3-act demo) · architecture.svg · router-decision-chain.svg · social.mp4 · promo.mp4 · og-image.png
+├── assets/        demo-routing.gif (3-act demo) · architecture.svg · router-decision-chain.svg · promo.mp4 · og-image.png
 ├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes config + plugin
 ├── config/        environment config sample (values redacted, shape kept)
 ├── router/        router-proxy.py · router-cache-probe.py · router-stats.py — the routing core · router-conformance.py · test-router-p0.py
