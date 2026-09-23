@@ -33,7 +33,7 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 </p>
 
 <p align="center">
-  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#limitations">Limitations</a>
+  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#typed-decisions-jev">Typed decisions</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#limitations">Limitations</a>
 </p>
 
 > **The cheapest model that verifiably does the job is the right model.**
@@ -105,6 +105,49 @@ Three components carry more weight than any single model:
 Tooling is acquired with discretion and scoped: external capability via contextual servers, and
 command-line tools drawn in narrowly (`npx`, `pip`) rather than accumulated into a sprawling
 surface.
+
+## Typed decisions instead of prose (Jev)
+
+One stage of the chain is not a chat model at all. `typesafe/jev-1.13` returns a **typed** answer —
+`Choice`, `Score` or `Noul` — with a calibrated probability, for roughly **$0.000027 per decision**
+in 0.34–0.48 s. The router can therefore *act on a decision* instead of parsing a sentence.
+
+Where it sits, and where it deliberately does not:
+
+| Use | Question asked | What the router does with the answer |
+|:--|:--|:--|
+| `len_class` | how long should this answer be? | sets the local tier's output cap (one-line / short / detailed → 96 / 320 / 1200 tokens) |
+| world-knowledge guard | does this need facts the model cannot hold? | a hit moves `local` **up** to a cloud tier, so a small model is never asked to recall a fact it will invent |
+| citation guard | does this claim need sources? | a hit moves the request to the research tier |
+
+Measured, not assumed — across 164 traced requests: the guards fired **5 times (3%)**; 61 of 80 local
+requests paid for a length classification; and the 13 privacy-forced requests paid **nothing**, because
+the privacy guard decides before Jev is ever consulted. Three implementation notes came straight out of
+that measurement:
+
+- **One call, not three.** Length classification and both guards are merged into a single decision call
+  (`_jev_decide`); the original design made two sequential round-trips on the tier that is supposed to
+  be the fastest.
+- **Pure arithmetic never reaches it.** `2+2` short-circuits in code (`guard=['pure_calc:no_escalation']`),
+  so a calculation costs zero cloud calls.
+- **It can only move a request upward.** A guard can promote `local` to cloud; nothing can demote a
+  cloud decision, so the tier division of labour cannot be scrambled by a classifier.
+
+What we learned the hard way — the part worth copying:
+
+- **A `Choice` returns exactly one option.** Asked to pick the durable items from a list of four, it
+  answered 0.56 / 0.42 at confidence 0.43 — unusable. Ask one `Noul` per item instead.
+- **Do not use it for language or encoding judgements.** A plainly Traditional-Chinese input scored
+  0.47 on "is this traditional Chinese?".
+- **It reads literally.** A winding-up petition scored 0.2 on "mentions an official source" until the
+  criterion was written as an explicit condition.
+- **Keep arithmetic and dates in code.** TypeSafe's own list of jagged edges — math, date comparison,
+  indirection, large irrelevant state, contradictory criteria — is accurate.
+- **It is a cloud call, so it never sits in front of private traffic.** The typed-decision model leaves
+  the box; the privacy guard runs first and fail-closes to the local tier, where Jev is not consulted
+  at all.
+- **Measure it, or do not claim it.** `/healthz` reports `jev_calls` and every response carries
+  `x-guard`, so "the guards are cheap" is a number rather than a belief.
 
 ## The Guardrail
 
