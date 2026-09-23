@@ -41,11 +41,11 @@
 <path d="M 70 400 L 1090 400" stroke="#475569" stroke-width="1"/>
 <text x="70" y="134" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">seconds, 0 to 15.6</text>
 <rect x="60" y="440" width="1030" height="74" rx="12" fill="#0f172a" stroke="#34d399" stroke-width="1" stroke-dasharray="3 3"/>
-<text x="80" y="466" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0">guards fire on 3% of requests — and they are arithmetic, not a model call</text>
-<text x="80" y="488" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">80 local requests, 61 pay for length classification; 13 forced local by privacy, 0 of them paid</text>
-<text x="80" y="506" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">local avoids the cloud bill entirely; the guard only ever moves traffic up</text>
+<text x="80" y="466" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0">guard economics on the 164-request instrumented sample; guards fired on 3% of it</text>
+<text x="80" y="488" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">61 of 80 local requests pay for one Jev call; 13 privacy-forced requests paid nothing</text>
+<text x="80" y="506" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">local avoids the per-token cloud bill; the guard itself can still cost one call</text>
 <rect x="60" y="528" width="1030" height="74" rx="12" fill="#1e293b" stroke="#f472b6" stroke-width="1" stroke-dasharray="3 3"/>
 <text x="80" y="554" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0">the biggest lever is not tokens: research search floor 0.105 to 0.294 per call</text>
-<text x="80" y="576" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">that is 200 to 500 times the whole token bill of the sample — cache is the second lever</text>
+<text x="80" y="576" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">in this 284-request sample that is 200 to 500 times the whole token bill; cache is the second lever</text>
 <text x="80" y="594" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#64748b">cache is a client-behaviour saving: long stable prefix + a proxy that does not rewrite it</text>
 </svg>

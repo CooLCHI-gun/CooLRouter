@@ -57,7 +57,8 @@ FACTS = {
     "ledger": {"cloud_input": 0.000556, "local_avoided": 0.002449},
     "latency": {"gemma": 1.86, "gemma_p90": 15.6, "flash": 1.99, "flash_p90": 6.7,
                 "zen": 1.19, "vl_warm": 0.06, "vl_cold": 8.34, "sonar": 3.62},
-    "guards": {"fire_pct": 3, "local": 80, "length_pay": 61, "privacy_forced": 13, "paid": 0},
+    "guards": {"sample": 164, "fire_pct": 3, "local": 80, "length_pay": 61, "privacy_forced": 13, "paid": 0,
+               "jev_cost_each": 0.000027},
     "cost": {"research_low": 0.105, "research_high": 0.294, "ratio_low": 200, "ratio_high": 500},
     "arch": {"lines": 1150, "tiers": 6, "conformance": "11/11", "p0": "7/7"},
     "caveat": {"test_traffic_pct": 58},
@@ -169,9 +170,9 @@ def fig_routing():
         x += 165
     arrow(198, 202, 198, 245, CYAN, 2)
     arrow(610, 202, 610, 245, DIM, 2)
-    txt(80, 440, "Routing is arithmetic + guards, not a second model call.", 12, SLATE)
-    txt(80, 462, "The client's prompt prefix is never rewritten, so a prefix cache keeps paying.", 12, SLATE)
-    txt(80, 484, "Everything here was measured on one laptop; limits are listed in the README.", 11, DIM)
+    txt(80, 440, "Typed decisions are one Jev call; the arithmetic paths short-circuit in code.", 12, SLATE)
+    txt(80, 462, "Messages[] are forwarded untouched, so a client prefix cache keeps paying.", 12, SLATE)
+    txt(80, 484, "Sampled traffic here covers local, flash, vision, meta and research; voice is wired but unmeasured.", 11, DIM)
     return write("fig-routing.svg")
 
 
@@ -183,7 +184,7 @@ def fig_traffic():
     _parts.extend(head(W, H, "Measured traffic — where the requests went",
                        "284 traced requests through the proxy"))
     txt(60, 48, "Measured traffic — where the requests went", 22, TITLE, weight="700", spacing="-0.5", record=False)
-    txt(60, 72, "284 traced requests, prompts 20385 tokens, completions 37223 tokens", 12, SLATE, record=False)
+    txt(60, 72, "routing split from the 284-row trace; guard economics use a separate 164-request subset", 12, SLATE, record=False)
     x0, xmax, maxv = 300, 700, tr["local"]
     y = 120
     for label, val, col in (("local", tr["local"], GREEN), ("cloud", tr["cloud"], CYAN), ("research", tr["research"], PINK)):
@@ -219,7 +220,7 @@ def fig_cache():
                        "cache hit rate against client prefix length, log scale"))
     txt(60, 48, "Prompt cache — hit rate past the block threshold", 22, TITLE, weight="700", spacing="-0.5", record=False)
     txt(60, 72, "hit rate against client prefix length, log scale; measured through the proxy", 12, SLATE, record=False)
-    px, py, pw, ph = 90, 110, 980, 330
+    px, py, pw, ph = 90, 110, 980, 310   # leaves room for the axis caption above the footer band
     xmin, xmax = 128, 4096
     box(px, py, pw, ph, PANEL, BORDER, rx=8)
 
@@ -244,7 +245,7 @@ def fig_cache():
     tx = sx(c["threshold"])
     _parts.append('<path d="M %s %s L %s %s" stroke="%s" stroke-width="1.5" stroke-dasharray="4 3"/>'
                   % (tx, py, tx, py + ph, CYAN))
-    txt(tx - 8, py + 18, "threshold ≈ 256 tokens", 11, CYAN, anchor="end")
+    txt(tx - 8, py + 18, "floor ≈ 256 tokens", 11, CYAN, anchor="end")
     pts = [(p[0], p[2], CYAN, 5) for p in c["rows"]] + [(p[0], p[1], DIM, 4) for p in c["other"]]
     pts.sort()
     for xv, yv, col, r in pts:
@@ -260,9 +261,9 @@ def fig_cache():
                       % (ax, ly_low, MIN_FONT, FONT, DIM, str(xv)))
     txt(px + 14, py + ph - 16, "filled = probe rows   hollow ring = other runs", 11, DIM)
     box(60, 470, 1030, 70, PANEL, CYAN, dash=True)
-    txt(80, 496, "$0.003 / M hit vs $0.15 / M miss — 50× cheaper input", 12, TEXT)
-    txt(80, 518, "at a 2042-token prefix: 0.0000241 vs 0.000306 per turn = 12.7× cheaper", 12, SLATE)
-    txt(80, 536, "cached counts are always multiples of 64 (block granularity)", 11, DIM, fit="off")
+    txt(80, 496, "rates recorded on the leg used here: $0.003/M hit vs $0.15/M miss — a pricing ratio, not a bill ratio", 12, TEXT)
+    txt(80, 518, "at a 2042-token prefix in this sample: 0.0000241 vs 0.000306 per turn = 12.7× cheaper", 12, SLATE)
+    txt(80, 536, "observed floor and 64-token blocks are properties of this leg, not published provider rules", 11, DIM, fit="off")
     box(60, 556, 1030, 62, PANEL2, GREEN, dash=True)
     txt(80, 582, "leg switch GO → ZEN → GO keeps 98 / 98 / 98 — same model id, cache survives failover", 12, GREEN)
     txt(80, 602, "honest caveat: one 927-token run reported 0% and could not be reproduced (write race)", 11, DIM)
@@ -296,12 +297,12 @@ def fig_latency():
     _parts.append('<path d="M 70 %s L 1090 %s" stroke="%s" stroke-width="1"/>' % (y0, y0, BORDER))
     txt(70, y0 - maxpx - 16, "seconds, 0 to 15.6", 11, DIM)
     box(60, 440, 1030, 74, PANEL, GREEN, dash=True)
-    txt(80, 466, "guards fire on 3% of requests — and they are arithmetic, not a model call", 12, TEXT)
-    txt(80, 488, "80 local requests, 61 pay for length classification; 13 forced local by privacy, 0 of them paid", 12, SLATE)
-    txt(80, 506, "local avoids the cloud bill entirely; the guard only ever moves traffic up", 11, DIM, fit="off")
+    txt(80, 466, "guard economics on the 164-request instrumented sample; guards fired on 3% of it", 12, TEXT)
+    txt(80, 488, "61 of 80 local requests pay for one Jev call; 13 privacy-forced requests paid nothing", 12, SLATE)
+    txt(80, 506, "local avoids the per-token cloud bill; the guard itself can still cost one call", 11, DIM, fit="off")
     box(60, 528, 1030, 74, PANEL2, PINK, dash=True)
     txt(80, 554, "the biggest lever is not tokens: research search floor 0.105 to 0.294 per call", 12, TEXT)
-    txt(80, 576, "that is 200 to 500 times the whole token bill of the sample — cache is the second lever", 12, SLATE)
+    txt(80, 576, "in this 284-request sample that is 200 to 500 times the whole token bill; cache is the second lever", 12, SLATE)
     txt(80, 594, "cache is a client-behaviour saving: long stable prefix + a proxy that does not rewrite it", 11, DIM, fit="off")
     return write("fig-latency-cost.svg")
 

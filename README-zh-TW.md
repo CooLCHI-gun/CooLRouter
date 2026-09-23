@@ -84,6 +84,12 @@
 2. **執行層** —— 一個不花俏的迴圈。它呼叫相關技能、透過受控作用的客戶端呼叫真實工具，並且在取得驗證之前，不會宣稱完成。精巧之處在於技能，而非迴圈本身。
 3. **技能庫** —— 程序性記憶。一個條目是某類重複性工作的操作方法，只在相關時才載入，一旦出現偏差或缺陷就會被修訂。複利式的學習累積在此。
 
+> 註：本 repository 同時使用兩套詞彙，混用會直接誤讀。**上表描述的是整體配置的能力階梯**（agent 加上
+> 它的技能）；**而路由器本身只 dispatch 到六個引擎** —— `local`、`flash`、`meta`、`vision`、`voice`、
+> `research`，這才是 routing contract 圖與程式碼所顯示的內容。下方的流量樣本涵蓋 `local`、`flash`、
+> `vision`、`meta` 與 `research`；`voice` 已接線但本樣本未量測；agentic 與 critique 兩級存在於 agent
+> 迴圈之中，而非路由器之內。上表任何一列都不是吞吐量宣稱。
+>
 > 註：**能力等級**（faculty）在此指「該等級加上為回答請求所需的一組具體技能與工具」。
 
 工具的引入是有節制且範圍受控的：外部能力經由情境伺服器提供，命令列工具以精簡方式導入（`npx`、`pip`），而非逐步堆疊成龐雜的介面。
@@ -143,8 +149,6 @@
 
 ## 部署
 
-```sh
-cp deploy/.env.example .env     # 只填入你實際持有的 key
 最快看到它跑起來的方式 — 無需 clone、無需 virtualenv、也無需預裝 Python（`uv` 會在機器沒有 Python
 時自行安裝）：
 
@@ -154,7 +158,9 @@ uv run https://raw.githubusercontent.com/CooLCHI-gun/CooLRouter/main/router/rout
 
 要永久安裝為服務：
 
-sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.ps1）
+```sh
+cp deploy/.env.example .env      # 只填入你實際持有的 key
+sh deploy/install.sh             # Linux / macOS（Windows 用 ./deploy/install.ps1）
 ```
 
 路由核心是單一 Python 檔案，沒有任何第三方依賴，因此「部署」等同「執行它」。[`deploy/`](deploy/)
@@ -188,10 +194,15 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 ![Cache 命中率對 client prefix 長度（對數刻度）](assets/fig-cache.svg)
 
 *Cache 命中率對 client prefix 長度（對數刻度）。實心點為下方表格的 probe 數據，空心圈為其他獨立
-測量。門檻約在 256 tokens，且所有 cached 數值皆為 64 的倍數 —— 即 block 粒度。*
+測量。實測到的門檻約在 256 tokens，且 cached 數值以 64 為單位 —— 這兩項屬於本 leg 的實測行為，
+並非供應商公佈的規則。*
 
-雲端 leg 嘅 input 收費係 **miss $0.15/M、hit $0.003/M** — 相差 50 倍 — 所以一個 router 最貴嘅行為就係
-令 prefix 無法 cache。以下用 `python router/router-cache-probe.py` 對真實 leg 實測：
+此處所用雲端 leg 的 input 計費為 **hit $0.003/M、miss $0.15/M**，相差 50 倍。這個比值屬於本 leg 的
+紀錄費率，並非市場通則：供應商各自公佈自己的數字，例如
+[OpenAI 的 prompt caching 說明](https://openai.com/index/api-prompt-caching/) 記載最低 **1,024 tokens**、
+以 **128 tokens** 為增量，Anthropic 亦記載約 1,024。真正可轉移的重點不是倍數，而是
+**一個 router 可以因為改寫它轉發的 prefix 而毁掉整個折扣**。以下用
+`python router/router-cache-probe.py` 對真實 leg 實測：
 
 | prefix | cached_tokens | 命中 | input 成本 | 對比無 cache |
 |:--|--:|--:|--:|--:|
@@ -204,20 +215,26 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 
 這張表確立三件事：
 
-1. **門檻約在 256 tokens**（232 → 0%、285 → 90%），而且每個 cached 值都是 64 的倍數 — 即 block 粒度，
-   所以短於幾個 block 的 prefix 永遠拿不到折扣。一次性 prompt 在門檻之下，agent session 遠在門檻之上。
-2. **切換 leg 不會失去 cache。** 兩條 leg 是同一個 model id，因此 GO → ZEN → GO 每一步都維持 **98%**：
-   failover 在 cache 層面是免費的；但切換 **model** 就要從 0 重新開始。
-3. **路由器嘅貢獻係「負空間」工作。** 它從不改寫、重排或蓋章於轉發嘅 messages（只讀最後一輪），
-   所以客戶端嘅 prefix 保持 byte-identical 而持續命中。任何 per-request 注入 system prompt 嘅做法，
-   都會令每個客戶端在 input 上多付約 25 倍 — 呢個係一個「好心」嘅 router 可以做嘅最貴行為。
+1. **本 leg 實測到的門檻約在 256 tokens**（232 → 0%、285 → 90%），且 cached 數值以 64 為單位。
+   這兩項應視為本 leg 的行為，而非供應商規則 —— 公開文件記載的數字更大。無論如何，一次性 prompt
+   在門檻之下，而 agent session 遠在門檻之上。
+2. **在本次測試中，切換 leg 沒有失去 cache。** 兩條 leg 服務同一個 model id，因此 GO → ZEN → GO
+   每一步都維持 **98%**。這是關於這一對 leg 的證據，並非普遍保證：切換到不同的 **model** 會從 0 重新開始。
+3. **路由器的貢獻是「負空間」工作。** 它不改動所轉發的 messages（只讀最後一輪），因此客戶端的 prefix
+   保持 byte-identical 而持續命中。若在 system prompt 注入 per-request 文字，以本次實測的
+   3,657-token prompt 計算，input 成本約增加 25 倍。
 
-**唔宣稱嘅事**：機制本身唔新穎 — 任何 passthrough proxy 都會保留 prefix。罕見嘅係把它量出來、公佈門檻，
-並且附上 probe 令這張表可被重現或推翻。
+**不宣稱的事**：機制本身並非獨創，而且「proxy 必然保留 prefix」並非普遍定律 —— 任何注入 header、
+套用 system prompt 模板或重排 messages 的 gateway 都會破壞它，這正是為何值得把它當成一項性質來陳述，
+而非當成前提。路由構想本身更接近的先例包括 [LiteLLM Proxy](https://github.com/BerriAI/litellm)、
+[RouteLLM](https://github.com/lm-sys/RouteLLM)、[Portkey gateway](https://github.com/Portkey-AI/gateway)
+與 [Bifrost](https://github.com/maximhq/bifrost)；本 repository 不主張自己是第一個，只主張它量測了自己
+的數字，並公開到可以被檢驗。
 
-誠實限制：有一次 ~927 tokens 出現 0% 命中且無法重現（cache 寫入競態 — 重打時寫入尚未落地），
-所以單次 miss 應視為雜訊、需重測。上游 `cache_write_tokens` 一律回 null，寫入成本無法報告。
-價格採用 tier 文件所記錄嘅費率。
+誠實限制：有一次 ~927 tokens 出現 0% 命中且無法重現（cache 寫入競態 —— 重打時寫入尚未落地），
+因此單次 miss 應視為雜訊並重新探測。此 leg 的 API 對 `cache_write_tokens` 回傳 null，寫入成本無法報告；
+null 亦可能代表該 endpoint 根本沒有暴露此指標。價格為本 leg 記錄的費率；可重現的是**方法**
+（`python router/router-cache-probe.py` 對你自己設定的 leg 執行），而非這些具體數值。
 
 ## 實測數據
 

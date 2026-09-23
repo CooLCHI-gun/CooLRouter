@@ -45,8 +45,10 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 
 ![CooLRouter — one request reaches exactly one tier, behind a fail-closed guard](assets/fig-routing.svg)
 
-*One request reaches exactly one of the six tiers, behind a fail-closed privacy guard, with the
-payload passed through untouched. Generated from this repository's own data — see `tools/gen-figures.py`.*
+*The contract: one request reaches exactly one tier, behind a fail-closed privacy guard, with the
+payload passed through untouched. The traffic sample behind this repository covers local, flash,
+vision, meta and research — `voice` is wired but unmeasured here. Generated from this repository's own
+data: `tools/gen-figures.py`.*
 
 ## Why CooLRouter
 
@@ -76,6 +78,14 @@ It's built around three convictions:
 | **Tier 3 · Trend** | real-time web | hot topics, live feeds, freshness | live · web-grounded |
 | **Tier 4 · Agentic** | autonomous, multi-step | self-sustaining workflow | orchestration-bound |
 | **Tier 5 · Critique** | self-eval, adversarial review | challenge the output before it ships; enforces the guardrail | guardrail-bound |
+
+Two vocabularies are in play, and mixing them is the fastest way to misread this repository. **This
+table names capability levels of the overall arrangement** (the agent plus its skills). **The router
+itself dispatches to six engines** — `local`, `flash`, `meta`, `vision`, `voice`, `research` — which is
+what the routing-contract figure and the code show. The traffic sample below exercises `local`, `flash`,
+`vision`, `meta` and `research`; `voice` is wired but unmeasured here, and the agentic and critique
+levels live in the agent loop rather than inside the router. Nothing in this table is a throughput
+claim.
 
 Here, **faculty** means "the tier plus the concrete skills and tools used to answer the request".
 
@@ -129,7 +139,8 @@ Where it sits, and where it deliberately does not:
 | world-knowledge guard | does this need facts the model cannot hold? | a hit moves `local` **up** to a cloud tier, so a small model is never asked to recall a fact it will invent |
 | citation guard | does this claim need sources? | a hit moves the request to the research tier |
 
-Measured, not assumed — across 164 traced requests: the guards fired **5 times (3%)**; 61 of 80 local
+Measured, not assumed — across the 164-request instrumented subset of that same trace: the guards fired
+**5 times (3%)**; 61 of 80 local
 requests paid for a length classification; and the 13 privacy-forced requests paid **nothing**, because
 the privacy guard decides before Jev is ever consulted. Three implementation notes came straight out of
 that measurement:
@@ -186,8 +197,6 @@ Each arrangement substitutes a shinier alternative — declined, usually for cos
 
 ## Deploy
 
-```sh
-cp deploy/.env.example .env     # add only the keys you actually have
 The fastest way to see it run - no clone, no virtualenv, no Python prerequisite (`uv` installs a
 Python if the machine has none):
 
@@ -197,7 +206,9 @@ uv run https://raw.githubusercontent.com/CooLCHI-gun/CooLRouter/main/router/rout
 
 For a permanent install as a service:
 
-sh deploy/install.sh            # Linux / macOS   (./deploy/install.ps1 on Windows)
+```sh
+cp deploy/.env.example .env      # add only the keys you actually have
+sh deploy/install.sh             # Linux / macOS   (./deploy/install.ps1 on Windows)
 ```
 
 One Python file, no third-party dependencies. [`deploy/`](deploy/) carries the wrappers — install
@@ -238,8 +249,12 @@ the full Remotion project under `promo/`.
 table below; hollow rings are separate runs. The floor sits near 256 tokens, and every cached count
 is a multiple of 64 — block granularity.*
 
-The cloud legs bill input at **$0.15/M on a miss and $0.003/M on a hit** - a 50x gap - so the most
-expensive thing a router can do is make a prefix un-cacheable. Measured against the live legs with
+The cloud leg used here bills input at **$0.003/M on a cache hit and $0.15/M on a miss** - a 50x
+pricing gap. That ratio belongs to this recorded leg, not to the market: vendors publish their own
+numbers, and [OpenAI's prompt-caching note](https://openai.com/index/api-prompt-caching/) documents a
+**1,024-token minimum** and **128-token increments**, while Anthropic documents roughly 1,024 as well.
+The transferable point is not the multiplier, it is that **a router can destroy the discount by
+rewriting the prefix it forwards**. Measured against the live leg with
 `python router/router-cache-probe.py`:
 
 | prefix | cached_tokens | hit | input cost | vs uncached |
@@ -253,24 +268,33 @@ expensive thing a router can do is make a prefix un-cacheable. Measured against 
 
 Three things this establishes:
 
-1. **The floor sits around 256 tokens** (232 -> 0%, 285 -> 90%) and every cached amount is a multiple
-   of 64 - block granularity, so a prefix shorter than a few blocks can never earn the discount. A
-   one-shot prompt lives below the floor; an agent session lives far above it.
-2. **A leg switch does not lose the cache.** Same model id on both legs, so GO -> ZEN -> GO held at
-   **98% on every step**: failover is free in cache terms, while switching *model* starts again at 0.
-3. **The router's contribution is negative-space work.** It never rewrites, re-orders or stamps the
-   messages it forwards (it only reads the final turn), so a client's prefix stays byte-identical and
-   keeps hitting. Injecting per-request text into the system prompt would cost every client ~25x on
-   input - the most expensive thing a "helpful" router can do.
+1. **The floor we observed on this leg sits near 256 tokens** (232 -> 0%, 285 -> 90%), and cached
+   amounts came back as multiples of 64. Read those as this leg's behaviour, not a provider rule -
+   the documented figures above are larger. Either way, a one-shot prompt lives below the floor and an
+   agent session lives far above it.
+2. **A leg switch did not lose the cache in this test.** Both cloud legs serve the same model id, so
+   GO -> ZEN -> GO held at **98% on every step**. That is evidence about this pair, not a general
+   guarantee: switching to a different *model* starts again at 0.
+3. **The router's contribution is negative-space work.** It leaves the messages it forwards alone (it
+   only reads the final turn), so a client's prefix stays byte-identical and keeps hitting. Injecting
+   per-request text into the system prompt would have cost roughly 25x on input for the 3,657-token
+   prompt measured here.
 
-What is *not* claimed here: the mechanism is not novel - any pass-through proxy preserves a prefix.
-What is uncommon is measuring it, publishing the floor, and shipping the probe so the table can be
-reproduced or refuted.
+What is *not* claimed here: the mechanism is not novel, and "a proxy preserves a prefix" is not a
+universal law - a gateway that injects headers, templates a system prompt or reorders messages breaks
+it, which is exactly why it is worth stating as a property instead of assuming it. Closer precedents
+for the routing idea itself are [LiteLLM Proxy](https://github.com/BerriAI/litellm),
+[RouteLLM](https://github.com/lm-sys/RouteLLM), [Portkey's gateway](https://github.com/Portkey-AI/gateway)
+and [Bifrost](https://github.com/maximhq/bifrost); this repository is not claiming to be the first, it
+is claiming to have measured its own numbers and published them where they can be checked.
 
 Honest limits: one run showed a 0% hit at ~927 tokens that did not reproduce (a cache-write race - the
-repeat arrived before the write landed), so treat a single miss as noise and re-probe. The provider
-returns `cache_write_tokens: null`, so write costs cannot be reported. Prices are the recorded rates
-from the tier notes.
+repeat arrived before the write landed), so treat a single miss as noise and re-probe. The API returns
+`cache_write_tokens: null` for this leg, so write costs cannot be reported - a null may also mean the
+endpoint simply does not expose that metric. Prices are the rates recorded for this leg, and the
+provider and model are named in the tier table below rather than hidden. What is reproducible here is
+the *method* (`router/router-cache-probe.py` against whatever legs you configure) rather than these
+exact values.
 
 ## Measured
 
@@ -280,9 +304,13 @@ from the tier notes.
 read the shape rather than the absolute split.*
 
 Every number below comes from `logs/router-trace.jsonl` (the router writes one line per request) and
-can be reproduced with `python router/router-stats.py <trace>`. The sample is 284 requests over 26
-hours of development traffic, and most of it is deliberately synthetic (`source=explicit`, 58%), so
-read it as a description of **how the router behaves** - not as a production workload.
+can be read back with `python router/router-stats.py <trace>`. The sample is **284 requests over 26
+hours** of development traffic, and most of it is deliberately synthetic (`source=explicit`, 58%), so
+read it as a description of **how the router behaves** - not as a production workload. Two denominators
+are in play and they are not interchangeable: the routing split uses all **284 rows**, while guard
+economics use a smaller **164-request instrumented subset** (which is why the local count reads 147 in
+one place and 80 in the other). The raw trace is not shipped - it is one machine's development traffic -
+so what is reproducible here is the *method*: point `router-stats.py` at your own trace.
 
 | | requests | share |
 |:--|--:|--:|

@@ -5,7 +5,7 @@
 <rect x="0" y="0" width="1150" height="520" fill="#020617"/>
 <rect x="0" y="0" width="1150" height="520" fill="url(#grid)"/>
 <text x="60" y="48" font-size="22" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#f1f5f9" font-weight="700" letter-spacing="-0.5">Measured traffic — where the requests went</text>
-<text x="60" y="72" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">284 traced requests, prompts 20385 tokens, completions 37223 tokens</text>
+<text x="60" y="72" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#94a3b8">routing split from the 284-row trace; guard economics use a separate 164-request subset</text>
 <text x="80" y="147" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#e2e8f0" font-weight="700">local</text>
 <rect x="300" y="120" width="700" height="40" rx="6" fill="#34d399" stroke="#34d399" stroke-width="0"/>
 <text x="312" y="146" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#020617" font-weight="700">147</text>
