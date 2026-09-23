@@ -86,6 +86,11 @@ needs to be *challenged* after it is produced.
 Request → Intention → Faculty → Guardrail → Execution → Corroboration → Output
 ```
 
+The routing core is published here: [`router/router-proxy.py`](router/router-proxy.py), documented
+in [`docs/router-architecture.md`](docs/router-architecture.md) — the architecture diagram, the
+13-stage decision chain, the tier table, the response contract, the guards, and the failure modes
+that were found and fixed by adversarial review.
+
 Three components carry more weight than any single model:
 
 1. **The Intention Router** — decides *where* a matter is heard, based on what the matter is,
@@ -131,8 +136,9 @@ Each arrangement substitutes a shinier alternative — declined, usually for cos
 .
 ├── assets/        architecture.svg · demo.gif · social.mp4 · promo.mp4 · og-image.png
 ├── config/        environment config sample (values redacted, shape kept)
+├── router/        router-proxy.py — the routing core, plus its own README
 ├── skills/        sample skill entries — the pattern, not the content
-├── docs/          working notes + LinkedIn post draft
+├── docs/          router-architecture.md (deep dive) · sonar-review · working notes
 ├── README.md      this file (English canonical)
 ├── README-zh-TW.md  繁體中文導讀 (reading guide)
 └── LICENSE        MIT
