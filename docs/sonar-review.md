@@ -62,7 +62,7 @@ Without adding real implementation details or fake metrics:
 
 **Minor issues**
 
-- Dense paragraphs with multi-clause sentences slow scanning (especially “Why CooLRouter” and “Why it’s public”). For a LinkedIn audience clicking through, a bit more chunking would help.
+- Dense paragraphs with multi-clause sentences slow scanning (especially “Why CooLRouter” and “Why it’s public”). For a reader scanning the README, a bit more chunking would help.
 - The “How Routing Works” section contains the core pipeline, but the text that follows is strongly narrative and somewhat abstract; the pipeline and the three components could be slightly more aligned visually.
 - The English README is longer and more discursive than many engineers expect for a CLI tool. That’s deliberate, but you can trim a few flourishes without losing personality.
 
@@ -296,4 +296,4 @@ If you only make a few changes:
 3. **Add a short, conceptual “Example routing flow” section** to anchor the architecture in concrete scenarios without adding real implementation.
 4. **Trim or rephrase a handful of most-literary English phrases** to keep the tone elevated but less essayistic.
 
-With those, the repo will read as a credible, principled engineering showcase, not marketing or AI-slop, and the zh-TW guide will match that professionalism.
+With those, the repo will read as a credible, principled engineering project, not marketing or AI-slop, and the zh-TW guide will match that professionalism.

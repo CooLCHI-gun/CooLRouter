@@ -122,7 +122,7 @@ parse/validate → deterministic privacy and modality policy → explicit-tier p
 - **VRAM 檢查應在 session pin 之前**：先選可行路徑，再用實際使用的 tier 更新 pin。
 - **cooldown lookup 屬 provider selection**：應在選定 tier 之後、選 leg 之前，只影響選哪條腿，不改語意層決策。
 
-**Q4 是否適合開源** — 可作為 prototype／portfolio systems project，但未達 production gateway 水準。資深 reviewer 首先會因為 **policy correctness 與 testability** 而拒收（不是因為選了 Python 或單進程）：沒有正式的優先權表與決策不變式；regex 隱私偵測被當成硬保證；learned classifier 與 typed-decision model 進入 control plane 卻沒有 calibration、adversarial test 與 deterministic fallback；session pin 為 cache 最佳化而犧牲路由正確性；以「quota-shaped errors」作為 cooldown 依據會誤分類 provider failure；缺少 deadline、retry budget、cancellation、cost limit 與可重播 trace 的契約。
+**Q4 是否適合開源** — 可作為 prototype／systems project，但未達 production gateway 水準。資深 reviewer 首先會因為 **policy correctness 與 testability** 而拒收（不是因為選了 Python 或單進程）：沒有正式的優先權表與決策不變式；regex 隱私偵測被當成硬保證；learned classifier 與 typed-decision model 進入 control plane 卻沒有 calibration、adversarial test 與 deterministic fallback；session pin 為 cache 最佳化而犧牲路由正確性；以「quota-shaped errors」作為 cooldown 依據會誤分類 provider failure；缺少 deadline、retry budget、cancellation、cost limit 與可重播 trace 的契約。
 
 **Q5 Top-3 修復（按風險降低／工作量排序）**
 1. **把路由政策變成顯式且具權威性**：實作單一純函式 `decide(request, state) -> Decision`，附文件化的優先權表與不變式——privacy 只能限制 cloud、explicit tier 不能繞過 policy、session pin 不能覆蓋可行性或 modality。
