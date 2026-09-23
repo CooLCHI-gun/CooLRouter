@@ -209,7 +209,7 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 | **P1** | Windows 上預設 `allow_reuse_address` 容許**第二個** instance 綁同一 port：兩個 router 交錯服務、狀態分歧，而且「修復看似無效」其實是被舊 instance 服務 | `allow_reuse_address = False`，第二個 instance 直接失敗 | 修復前實測兩個 PID 同時 LISTENING 同一 port |
 | **P0** | Router 把內部簿記 key（`_forced_local`、`_jev`）轉發上游，provider 回 `HTTP 400 Unsupported parameter(s)` → **整個 vision tier 死亡**，所有圖片請求失敗後兩條腿更進入 cooldown | `_call_leg` 於呼叫上游前剝除所有 `_` 開頭 key（未來任何內部 key 一併受保護） | vision 文字請求 → `HTTP 200`、`leg=go` |
 | **P0** | **Cooldown 連鎖**：一個 request-shaped 錯誤（400／422／validation）令健康的 leg 進入 60 秒 cooldown → 一張壞圖令之後所有 flash 請求回 502 | request-shaped 錯誤不再冷卻健康的 leg（cooldown 只留給真正 down 掉的腿） | 壞圖失敗後 flash 立即恢復 |
-| **P1** | **圖片請求被送去文字 tier**：真 512×512 PNG 經 classifier 判為 `local`，而本機呼叫把 content list 以 `json.dumps()` 塞入 `prompt` — 圖片從未以 Ollama 的 `images` 欄位傳入，模型於是「描述」base64 文字 | 新增 IMAGE GUARD（帶圖請求 → `vision` tier）；`_call_ollama` 正確分流 text／`images` 並改用本機 VL model；Perplexity gate 同時排除帶圖請求（Sonar 睇唔到圖） | conformance **11/11**；64×64 與 512×512 真圖在 cloud 與本機 VL 兩條路徑答案皆正確 |
+| **P1** | **圖片請求被送去文字 tier**：真 512×512 PNG 經 classifier 判為 `local`，而本機呼叫把 content list 以 `json.dumps()` 塞入 `prompt` — 圖片從未以 Ollama 的 `images` 欄位傳入，模型於是「描述」base64 文字 | 新增 IMAGE GUARD（帶圖請求 → `vision` tier）；`_call_ollama` 正確分流 text／`images` 並改用本機 VL model；Perplexity gate 同時排除帶圖請求（Sonar 睇唔到圖）；**圖片請求豁免 VRAM gate**（慢但正確 ＞ 靜默降級去文字 tier） | conformance **11/11**：兩個 image row 都要求 `x-local-vision=true`（真實本地生成），64×64 與 512×512 真圖在 cloud 與本機 VL 兩條路徑答案皆正確 |
 | **P1** | 純算術被 typed-decision guard 誤判為「需要世界知識」而升級付費 cloud tier | 呼叫 guard 前以 `_PURE_CALC` regex 短路（零雲端呼叫），guard instruction 改為英文並明確排除計算 | regex 表 12/12；`what is 2+2` → `route=local, guard=['pure_calc:no_escalation']`，雲端呼叫 0 次 |
 | **P2** | 每個 question-shaped local 查詢付 2 次 typed-decision round-trip（~0.3–0.6s） | 兩個問題合併為一次呼叫 | trace 實測每次 local 請求 `jev_calls` delta = 1 |
 
@@ -225,7 +225,7 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 | 3 | **`video` 無法處理** | router 只收 chat-completions 文字 payload | 帶片的請求無法路由 | 用 Hermes `video_analyze`；影片生成另開 API |
 | 4 | **`voice` tier 是 placeholder** | 只回標記字串，不產生音檔 | 呼叫者若以為有音檔會失望 | 文件與 metadata 已聲明；真 TTS 用 Hermes 內建 |
 | 5 | **`router-classifier.pkl` 未定期重訓** | 檔案時間 2026-07-26 | 模型與實際使用分佈逐漸脫節 | 加入定期重訓流程（`scripts/train-router.py`） |
-| 6 | **本機文字模型與 VL 模型在同一張 6GB 卡上無法同時常駐** | 交替請求會互相 evict：實測 VL cold load 令整個 conformance 跑程需 ~172 秒 | 本機圖片請求首次回應偏慢 | 屬硬體上限；已用 `keep_alive=3m` 控制，換大 VRAM 機器即緩解 |
+| 6 | **本機文字模型與 VL 模型在同一張 6GB 卡上無法同時常駐** | 實測（已確認 GPU 在用）：Qwen3-VL 佔 3.25GB ＋ embedding 2.15GB ＝ 5.40GB / 6.14GB，載入 VL 時 gemma3 被 evict；cold load 8.7 秒 | 交替文字／圖片請求會互相換出模型，首次回應偏慢 | 屬硬體上限。設計決定：圖片請求**不因 VRAM 降級去文字 tier**（見 §9.1）；`keep_alive=3m` 控制常駐時間；換大 VRAM 機器即緩解 |
 | 3 | **`x-ms` 與 `x-ms-total` 差距大** | `x-ms=61.5` vs `x-ms-total=11945.6`（同一筆請求） | 容易誤讀為 router 慢；實際是本機模型 cold start | 文件已標明語義；可考慮另加 `x-ms-model` 欄位 |
 | 4 | **Classifier 訓練資料是合成樣本** | 480 條模板生成樣本，97.1% 5-fold CV | 真實用戶查詢分佈可能不同，CV 數字偏樂觀 | 用 trace 累積真實查詢做 shadow 評估，再考慮重訓 |
 | 5 | **`video` 無法處理** | router 只收 chat-completions 文字 payload | 帶片的請求無法路由 | 用 Hermes `video_analyze`；影片生成另開 API |

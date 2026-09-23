@@ -108,11 +108,16 @@ check("image part -> vision tier", _vision)
 
 def _vision_local():
     """An image with an explicit tier=local stays home AND is served by the LOCAL VL MODEL —
-    never by a text model reading base64 as prose."""
+    never by a text model reading base64 as prose.
+
+    The assertion requires `x-local-vision is True`, a field only a real local generation sets.
+    A looser check (`x-route == "local"`) is satisfied by an error body too, so a fail-closed 503
+    would read as a PASS while the request was in fact never served (observed 2026-09-23).
+    """
     d = _image_call("what is in this image?", tier="local")
     return (d.get("x-route") == "local" and d.get("x-local-vision") is True,
-            "route=%s local_vision=%s model=%s" % (d.get("x-route"), d.get("x-local-vision"),
-                                                   d.get("model")))
+            "route=%s local_vision=%s model=%s err=%s" % (d.get("x-route"), d.get("x-local-vision"),
+                                                          str(d.get("model"))[:34], str(d.get("error"))[:40]))
 
 
 check("image + tier=local -> local VL", _vision_local)
@@ -121,9 +126,12 @@ check("image + tier=local -> local VL", _vision_local)
 def _vision_private():
     """An image plus private wording must fail closed: served locally, never sent to the cloud."""
     d = _image_call("this is my private photo, don't send it to the cloud")
-    return (d.get("x-forced-local") is True and d.get("x-route") == "local",
-            "forced=%s route=%s vision=%s" % (d.get("x-forced-local"), d.get("x-route"),
-                                              d.get("x-local-vision")))
+    # x-local-vision must be True: this proves a real local vision generation happened, not just
+    # that the decision said "local" (an error body carries the route without the model field).
+    return (d.get("x-forced-local") is True and d.get("x-route") == "local"
+            and d.get("x-local-vision") is True,
+            "forced=%s route=%s local_vision=%s err=%s" % (d.get("x-forced-local"), d.get("x-route"),
+                                                           d.get("x-local-vision"), str(d.get("error"))[:40]))
 
 
 check("image + private -> forced local", _vision_private)

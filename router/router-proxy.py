@@ -973,7 +973,13 @@ class RouterHandler(BaseHTTPRequestHandler):
         # after boot / after the 30m keep-alive expired). If another GPU workload is
         # VRAM at that moment, loading local would silently CPU-run (slow) or
         # OOM. Fail-closed for forced-local; degrade to flash for ordinary local.
-        if tier == "local" and not _local_model_loaded(_local_model_for(body)):
+        # An IMAGE request skips this gate on purpose. The gate's trade-off (do not load a model
+        # under VRAM contention, because it may silently CPU-run) is about SPEED; for an image the
+        # trade-off is different — a slow local vision answer is still a CORRECT one, whereas
+        # degrading the request would hand a picture to a text tier, which is the bug this guard
+        # exists to prevent. Measured 2026-09-23: with a text model resident (VRAM 5902 MB > 4500)
+        # `tier=local` + image was degraded to flash, i.e. straight back to a text model.
+        if tier == "local" and not _img_req and not _local_model_loaded(_local_model_for(body)):
             vram = _gpu_vram_used_mb()
             if vram > LOCAL_VRAM_USED_MAX_MB:
                 if result_forced_local:
