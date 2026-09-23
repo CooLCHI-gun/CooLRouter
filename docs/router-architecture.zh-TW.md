@@ -199,6 +199,19 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 ## 9. 已知限制與問題（2026-09-23 實測）
 
+### 9.1 已修復並驗證（2026-09-23）
+
+| 嚴重度 | 缺陷 | 修復 | 驗證方式 |
+|---|---|---|---|
+| **P0** | 上游回 `HTTP 200` 但內容為空時被當成成功：呼叫者收到空白答案，而 leg chain 永遠不會嘗試下一條腿 | 空內容（或無 `choices`）改為 raise，令 chain 前進 | 假上游回 `{"choices":[{"message":{"content":""}}]}` → 正確 raise；正常回應 → 成功 |
+| **P0** | `HTTPServer` 是單執行緒：一次 12 秒的本機生成或 120 秒的雲端呼叫會阻塞**所有**其他請求 | 改用 `ThreadingHTTPServer`，共享狀態以 `_LOCK` 保護 | 3 個並行請求 wall time 2.29 秒（＝最慢單個），非相加 |
+| **P1** | 重建回應時 `tool_calls` 被靜默丟棄（工具呼叫經 router 會失效） | 保留 `tool_calls`，`finish_reason` 如實反映 | 帶 `tool_calls` 的回應完整往返 |
+| **P1** | Windows 上預設 `allow_reuse_address` 容許**第二個** instance 綁同一 port：兩個 router 交錯服務、狀態分歧，而且「修復看似無效」其實是被舊 instance 服務 | `allow_reuse_address = False`，第二個 instance 直接失敗 | 修復前實測兩個 PID 同時 LISTENING 同一 port |
+
+完整功能測試：`cache/scratch/test-router-p0.py`（以真假上游驗證，非 mock 自身程式碼），7/7 通過。
+
+### 9.2 仍待處理
+
 | # | 問題 | 證據 | 影響 | 建議 |
 |---|---|---|---|---|
 | 1 | **Jev world-knowledge guard 對純算術誤判** | `"what is 2+2"` → `guard=['jev(wk=0.9,cit=0.07)', 'jev:needs_world_knowledge']` → 升級 flash | 簡單查詢被送去 cloud：多一次雲端費用與延遲，違背「trivial 留本機」目標 | 在呼叫 Jev 前先用 regex 排除純算術；或把 Jev 的 instruction 由「數字」改為「外部世界事實（非計算）」 |
@@ -228,7 +241,8 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 ## 11. 後續路線
 
-1. 修 #1、#2（guard 誤判與 Jev round-trip 合併）→ 本機路徑更快更省。
-2. 用真實 trace 做 shadow 評估，驗證 classifier 在真實分佈下的準確度。
-3. 把 `LOCAL_VRAM_USED_MAX_MB` 與 model 名稱抽成 config（目前寫死，換機（例如 24GB VRAM）會誤觸發）。
-4. 增加 conformance test：固定輸入 → 預期 tier／guard 的斷言清單，CI 可跑。
+1. 修 §9.2 的 #1、#2（guard 誤判與 Jev round-trip 合併）→ 本機路徑更快更省。
+2. 補齊執行層：request body 大小上限、跨所有 fallback 的 end-to-end deadline、並發上限、客戶端斷線即取消。
+3. 用真實 trace 做 shadow 評估，驗證 classifier 在真實分佈下的準確度。
+4. 把 `LOCAL_VRAM_USED_MAX_MB` 與 model 名稱抽成 config（目前寫死，換機（例如 24GB VRAM）會誤觸發）。
+5. 建立 table-driven conformance test（固定輸入 → 預期 tier／guard 的斷言清單，CI 可跑）。
