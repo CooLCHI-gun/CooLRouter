@@ -207,7 +207,9 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 Found by an adversarial review (a hosted reasoning model) cross-checked line-by-line against the
 source, then fixed and re-verified with a functional test that stands up a fake upstream
-([`router/test-router-p0.py`](router/test-router-p0.py) — 7/7 passing).
+([`router/test-router-p0.py`](router/test-router-p0.py) — 7/7 passing) and a table-driven
+conformance suite that runs against the live proxy
+([`router/router-conformance.py`](router/router-conformance.py) — 11/11 passing).
 
 | Severity | Defect | Fix | Verification |
 |---|---|---|---|
@@ -215,12 +217,16 @@ source, then fixed and re-verified with a functional test that stands up a fake 
 | **P0** | `HTTPServer` is single-threaded: one 12 s local generation or one 120 s cloud call blocked **every** other request | `ThreadingHTTPServer` with a global lock around shared state | 3 concurrent requests complete in 2.29 s wall (the slowest single one), not 3× |
 | **P1** | Tool calls were silently dropped when the response was rebuilt | `tool_calls` are preserved and `finish_reason` reflects them | Response with `tool_calls` round-trips intact |
 | **P1** | On Windows, the default `allow_reuse_address` let a **second** instance bind the same port, so two routers served interleaved requests with divergent state | `allow_reuse_address = False` — a second instance fails loudly | Two PIDs were observed listening on the same port before the fix |
-| **P2** | A typed-decision guard false-positives on pure arithmetic (`what is 2+2` scored 0.9 on "needs world knowledge") and escalates a trivial question to a paid cloud tier | Not yet fixed — needs a pre-check or a tighter instruction | Observed live in the trace |
-| **P2** | Every question-shaped local request pays two separate typed-decision round-trips (~0.3–0.6 s each) | Not yet fixed — merge both questions into one call | Documented, not yet measured |
+| **P0** | The router forwarded its own bookkeeping keys (`_forced_local`, `_jev`) upstream; the provider answered `HTTP 400 Unsupported parameter(s)` and **the whole perception tier died** — every image request failed and both legs then sat in cooldown | `_call_leg` strips every `_`-prefixed key before the upstream call, so any future internal key is covered | A perception text request → `HTTP 200`, `leg=go` |
+| **P0** | **Cooldown cascade**: a request-shaped error (400/422/validation) put a healthy leg into a 60 s cooldown, so one bad image made every later default-tier request return 502 | Request-shaped errors no longer cool down a healthy leg — cooldown is reserved for legs that are actually down | The default tier recovers immediately after a bad-image failure |
+| **P1** | **Image requests were routed to a text tier**: a real 512×512 PNG was classified `local` (short, simple prompt), and the local call `json.dumps()`-ed the content list into `prompt` — the image never reached the runtime's `images` field, so the model described base64 as prose | A dedicated image guard routes image requests to the perception tier; the local call now splits text from `images` and switches to the local vision model; the cited-search gate also refuses image requests, which it cannot see | Conformance **11/11**; real 64×64 and 512×512 images answered correctly on **both** the cloud and the local-vision path |
+| **P1** | A typed-decision guard false-positived on pure arithmetic (`what is 2+2` scored 0.9 on "needs world knowledge") and escalated a trivial question to a paid cloud tier | A pure-arithmetic regex short-circuits before the guard call (zero cloud calls); the guard instruction is now English and explicitly excludes calculation | Regex table 12/12; `what is 2+2` → `route=local`, `guard=['pure_calc:no_escalation']`, 0 cloud calls |
+| **P2** | Every question-shaped local request paid two separate typed-decision round-trips (~0.3–0.6 s each) | Both questions are merged into one call | Measured `jev_calls` delta of 1 per local request |
 
 **Still missing, and known to be missing:** request-body size caps, a per-request end-to-end
-deadline shared by all fallbacks, concurrency limits, cancellation when the client disconnects, and
-a table-driven conformance test suite. The design is a working personal gateway, not a production
+deadline shared by all fallbacks, concurrency limits, and cancellation when the client disconnects.
+The conformance suite exists and is table-driven — 11 rows spanning arithmetic, privacy, escalation,
+image routing, counters and concurrency — but it is run on demand, not in CI. The design is a working personal gateway, not a production
 one, and this section is the honest boundary.
 
 ---

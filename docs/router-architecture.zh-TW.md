@@ -164,7 +164,7 @@ flowchart TD
 | Jev citations | `cit > 0.7` | → `research` | 需要出處／最新資料 |
 | Research hint gate | 精準 fact／verify／recency pattern + 非 coding | → `research` | Perplexity 每次呼叫都有 search-context floor（約 $0.005–0.014），所以 gate 必須窄 |
 | DEV-TASK | `voice`/`video` + dev keyword | → `flash` | 防止「寫 ffmpeg 腳本」被當成語音／影片請求 |
-| VRAM | `local` 且 VRAM > 4500MB | 普通 → `flash`；forced-local → 503 | 6GB 卡上與其他 GPU 工作共用；私密請求寧願失敗也不外洩 |
+| VRAM | `local` 且 VRAM > 4500MB | 普通 → `flash`；forced-local → 503 | 6GB 卡上與遊戲共存；私密請求寧願失敗也不外洩 |
 | Leg cooldown | HTTP 429/402/403 或 quota 字眼 | 該腿停用 900s（其他錯誤 60s） | 額度耗盡時不重複撞牆 |
 
 ---
@@ -207,15 +207,25 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 | **P0** | `HTTPServer` 是單執行緒：一次 12 秒的本機生成或 120 秒的雲端呼叫會阻塞**所有**其他請求 | 改用 `ThreadingHTTPServer`，共享狀態以 `_LOCK` 保護 | 3 個並行請求 wall time 2.29 秒（＝最慢單個），非相加 |
 | **P1** | 重建回應時 `tool_calls` 被靜默丟棄（工具呼叫經 router 會失效） | 保留 `tool_calls`，`finish_reason` 如實反映 | 帶 `tool_calls` 的回應完整往返 |
 | **P1** | Windows 上預設 `allow_reuse_address` 容許**第二個** instance 綁同一 port：兩個 router 交錯服務、狀態分歧，而且「修復看似無效」其實是被舊 instance 服務 | `allow_reuse_address = False`，第二個 instance 直接失敗 | 修復前實測兩個 PID 同時 LISTENING 同一 port |
+| **P0** | Router 把內部簿記 key（`_forced_local`、`_jev`）轉發上游，provider 回 `HTTP 400 Unsupported parameter(s)` → **整個 vision tier 死亡**，所有圖片請求失敗後兩條腿更進入 cooldown | `_call_leg` 於呼叫上游前剝除所有 `_` 開頭 key（未來任何內部 key 一併受保護） | vision 文字請求 → `HTTP 200`、`leg=go` |
+| **P0** | **Cooldown 連鎖**：一個 request-shaped 錯誤（400／422／validation）令健康的 leg 進入 60 秒 cooldown → 一張壞圖令之後所有 flash 請求回 502 | request-shaped 錯誤不再冷卻健康的 leg（cooldown 只留給真正 down 掉的腿） | 壞圖失敗後 flash 立即恢復 |
+| **P1** | **圖片請求被送去文字 tier**：真 512×512 PNG 經 classifier 判為 `local`，而本機呼叫把 content list 以 `json.dumps()` 塞入 `prompt` — 圖片從未以 Ollama 的 `images` 欄位傳入，模型於是「描述」base64 文字 | 新增 IMAGE GUARD（帶圖請求 → `vision` tier）；`_call_ollama` 正確分流 text／`images` 並改用本機 VL model；Perplexity gate 同時排除帶圖請求（Sonar 睇唔到圖） | conformance **11/11**；64×64 與 512×512 真圖在 cloud 與本機 VL 兩條路徑答案皆正確 |
+| **P1** | 純算術被 typed-decision guard 誤判為「需要世界知識」而升級付費 cloud tier | 呼叫 guard 前以 `_PURE_CALC` regex 短路（零雲端呼叫），guard instruction 改為英文並明確排除計算 | regex 表 12/12；`what is 2+2` → `route=local, guard=['pure_calc:no_escalation']`，雲端呼叫 0 次 |
+| **P2** | 每個 question-shaped local 查詢付 2 次 typed-decision round-trip（~0.3–0.6s） | 兩個問題合併為一次呼叫 | trace 實測每次 local 請求 `jev_calls` delta = 1 |
 
-完整功能測試：`scripts/test-router-p0.py`（以真假上游驗證，非 mock 自身程式碼），7/7 通過。
+完整功能測試：`scripts/test-router-p0.py`（以真假上游驗證，非 mock 自身程式碼），**7/7 通過**。
+表驅動 conformance 測試：`scripts/router-conformance.py`（9 → 11 條 row，含 3 條圖片路由 row），**11/11 通過**。
 
 ### 9.2 仍待處理
 
 | # | 問題 | 證據 | 影響 | 建議 |
 |---|---|---|---|---|
-| 1 | **Jev world-knowledge guard 對純算術誤判** | `"what is 2+2"` → `guard=['jev(wk=0.9,cit=0.07)', 'jev:needs_world_knowledge']` → 升級 flash | 簡單查詢被送去 cloud：多一次雲端費用與延遲，違背「trivial 留本機」目標 | 在呼叫 Jev 前先用 regex 排除純算術；或把 Jev 的 instruction 由「數字」改為「外部世界事實（非計算）」 |
-| 2 | **每個 question-shaped local 查詢多付 2 次 Jev round-trip** | `_jev_len_class()` + `_jev_guards()` 各自呼叫 OpenRouter（~0.3–0.6s、$0.00002–0.00003） | 本機路徑延遲增加；本機 tier 本應最快 | 把兩個問題合併成一次呼叫（Jev 支援多問題）；或對短查詢跳過長度分類 |
+| 1 | **`x-ms` 與 `x-ms-total` 差距大** | `x-ms=61.5` vs `x-ms-total=11945.6`（同一筆請求） | 容易誤讀為 router 慢；實際是本機模型 cold start | 文件已標明語義；可考慮另加 `x-ms-model` 欄位 |
+| 2 | **Classifier 訓練資料是合成樣本** | 480 條模板生成樣本，97.1% 5-fold CV | 真實用戶查詢分佈可能不同，CV 數字偏樂觀 | 用 trace 累積真實查詢做 shadow 評估，再考慮重訓 |
+| 3 | **`video` 無法處理** | router 只收 chat-completions 文字 payload | 帶片的請求無法路由 | 用 Hermes `video_analyze`；影片生成另開 API |
+| 4 | **`voice` tier 是 placeholder** | 只回標記字串，不產生音檔 | 呼叫者若以為有音檔會失望 | 文件與 metadata 已聲明；真 TTS 用 Hermes 內建 |
+| 5 | **`router-classifier.pkl` 未定期重訓** | 檔案時間 2026-07-26 | 模型與實際使用分佈逐漸脫節 | 加入定期重訓流程（`scripts/train-router.py`） |
+| 6 | **本機文字模型與 VL 模型在同一張 6GB 卡上無法同時常駐** | 交替請求會互相 evict：實測 VL cold load 令整個 conformance 跑程需 ~172 秒 | 本機圖片請求首次回應偏慢 | 屬硬體上限；已用 `keep_alive=3m` 控制，換大 VRAM 機器即緩解 |
 | 3 | **`x-ms` 與 `x-ms-total` 差距大** | `x-ms=61.5` vs `x-ms-total=11945.6`（同一筆請求） | 容易誤讀為 router 慢；實際是本機模型 cold start | 文件已標明語義；可考慮另加 `x-ms-model` 欄位 |
 | 4 | **Classifier 訓練資料是合成樣本** | 480 條模板生成樣本，97.1% 5-fold CV | 真實用戶查詢分佈可能不同，CV 數字偏樂觀 | 用 trace 累積真實查詢做 shadow 評估，再考慮重訓 |
 | 5 | **`video` 無法處理** | router 只收 chat-completions 文字 payload | 帶片的請求無法路由 | 用 Hermes `video_analyze`；影片生成另開 API |
@@ -241,8 +251,8 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 ## 11. 後續路線
 
-1. 修 §9.2 的 #1、#2（guard 誤判與 Jev round-trip 合併）→ 本機路徑更快更省。
+1. ~~修 §9.2 的 guard 誤判與 typed-decision round-trip 合併~~ → **已完成（2026-09-23）**：純算術短路零雲端呼叫、兩問合併為一。
 2. 補齊執行層：request body 大小上限、跨所有 fallback 的 end-to-end deadline、並發上限、客戶端斷線即取消。
 3. 用真實 trace 做 shadow 評估，驗證 classifier 在真實分佈下的準確度。
 4. 把 `LOCAL_VRAM_USED_MAX_MB` 與 model 名稱抽成 config（目前寫死，換機（例如 24GB VRAM）會誤觸發）。
-5. 建立 table-driven conformance test（固定輸入 → 預期 tier／guard 的斷言清單，CI 可跑）。
+5. ~~建立 table-driven conformance test~~ → **已建立（2026-09-23）**：`scripts/router-conformance.py`，11 條 row。下一步是掛進 CI／cron（現為手動執行）。

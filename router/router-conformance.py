@@ -8,7 +8,7 @@ against the LIVE proxy, so it catches a guard that stops firing or a tier that q
 Run:  venv-router/Scripts/python.exe scripts/router-conformance.py
 Exit: 0 only when every row passes.
 """
-import json, sys, time, threading, urllib.request
+import json, sys, time, threading, urllib.error, urllib.request
 
 BASE = "http://127.0.0.1:8000"
 OK = []
@@ -71,18 +71,62 @@ check("citation request -> research", lambda: (
         *call("核實一下 DeepSeek V4.1 幾時推出，要附出處", mt=64))))
 
 
-def _vision():
+# A REAL 64x64 PNG (three colour bands + a white square). The old row sent
+# `iVBORw0KGgoAAAANSUhEUg==`, which is not a decodable image at all: the provider rejected it, the
+# row died on a 502 and the routing bug underneath it stayed invisible for a whole session.
+# A conformance fixture must be valid input.
+_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAnUlEQVR4nOXXoRXCQAAE0bl5KQEssVdE0hf9YSgCE00TqSECMY/vR63a8ZmTMomTOImTOImTOImTOImTOImTOImTOImTOImTOImTuDHfT8okTuIkTuIkTuIkTuIkTuIkTuIkTuIkTuIkTuIkTuIkbtweG2USJ3ESJ3HL1eB7vPix+7r/0QISJ3ESJ3ESJ3ESJ3ESJ3ESJ3ESN+qf+ATZ8AbvbdJOigAAAABJRU5ErkJggg=="
+
+
+def _image_call(text, tier=None, mt=48, timeout=240):
     body = {"messages": [{"role": "user", "content": [
-        {"type": "text", "text": "what is in this image?"},
-        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="}}]}],
-        "max_tokens": 32}
+        {"type": "text", "text": text},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64," + _PNG_B64}}]}],
+        "max_tokens": mt}
+    if tier:
+        body["tier"] = tier
     req = urllib.request.Request(BASE + "/v1/chat/completions", json.dumps(body).encode(),
                                 {"Content-Type": "application/json"})
-    d = json.loads(urllib.request.urlopen(req, timeout=200).read())
-    return d.get("x-route") == "vision", "route=%s" % d.get("x-route")
+    try:
+        return json.loads(urllib.request.urlopen(req, timeout=timeout).read())
+    except urllib.error.HTTPError as e:
+        # Even a failure carries the routing decision now (x-route / x-source / x-guard), so a
+        # dead leg can never hide a wrong decision.
+        try:
+            return json.loads(e.read().decode())
+        except Exception:
+            return {}
+
+
+def _vision():
+    d = _image_call("what is in this image?")
+    return d.get("x-route") == "vision", "route=%s guard=%s" % (d.get("x-route"), d.get("x-guard"))
 
 
 check("image part -> vision tier", _vision)
+
+
+def _vision_local():
+    """An image with an explicit tier=local stays home AND is served by the LOCAL VL MODEL —
+    never by a text model reading base64 as prose."""
+    d = _image_call("what is in this image?", tier="local")
+    return (d.get("x-route") == "local" and d.get("x-local-vision") is True,
+            "route=%s local_vision=%s model=%s" % (d.get("x-route"), d.get("x-local-vision"),
+                                                   d.get("model")))
+
+
+check("image + tier=local -> local VL", _vision_local)
+
+
+def _vision_private():
+    """An image plus private wording must fail closed: served locally, never sent to the cloud."""
+    d = _image_call("this is my private photo, don't send it to the cloud")
+    return (d.get("x-forced-local") is True and d.get("x-route") == "local",
+            "forced=%s route=%s vision=%s" % (d.get("x-forced-local"), d.get("x-route"),
+                                              d.get("x-local-vision")))
+
+
+check("image + private -> forced local", _vision_private)
 
 
 def _hz():

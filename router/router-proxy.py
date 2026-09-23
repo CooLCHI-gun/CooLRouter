@@ -47,7 +47,65 @@ LOCAL_VRAM_USED_MAX_MB = 4500
 # 912 chars of CoT, done_reason=length, i.e. ZERO answer. gemma3:4b answers the same prompt in
 # 1.6 s / 60 tokens / done=stop. The cap only works on a model that does not think out loud.
 _LOCAL_MODEL_NAME = "gemma3:4b"
+# Local VISION model. gemma3:4b is itself multimodal (Ollama reports capabilities
+# ["completion","vision"]), but the dedicated VL distill is the one measured correct on image
+# questions (11/11, 0.4 s), so image traffic on the local tier uses it. Env-overridable so a
+# different machine does not need a code edit.
+_LOCAL_VISION_MODEL = os.environ.get(
+    "ROUTER_LOCAL_VISION_MODEL", "hf.co/unsloth/Qwen3-VL-4B-Instruct-GGUF:Q4_K_M")
 _VRAM_ERR = None
+
+
+def _img_parts(msg) -> list:
+    """Content parts of a message (a bare string content has none)."""
+    c = (msg or {}).get("content")
+    return [p for p in c if isinstance(p, dict)] if isinstance(c, list) else []
+
+
+def _has_image(messages) -> bool:
+    """True when the payload actually carries an image.
+
+    An image is not something a text tier may answer. Without this, a short simple prompt
+    ("what is in this image?") classified as `local`, and the local call stringified the image
+    into the prompt as base64, so the model described text it could not see.
+    """
+    for m in (messages or []):
+        for p in _img_parts(m):
+            if p.get("type") in ("image", "image_url", "input_image"):
+                return True
+        c = (m or {}).get("content")
+        if isinstance(c, str) and "data:image/" in c:
+            return True
+    return False
+
+
+def _split_multimodal(msg) -> tuple:
+    """(text, [b64 images]) for one message.
+
+    Ollama takes images in its own `images` field — a json.dumps()'d content list is just text
+    to it, which is exactly how a vision request silently became a hallucination.
+    """
+    text, imgs = [], []
+    for p in _img_parts(msg):
+        t = p.get("type")
+        if t in ("image", "image_url", "input_image"):
+            u = p.get("image_url")
+            u = u.get("url") if isinstance(u, dict) else (u if isinstance(u, str) else "")
+            u = str(u or p.get("data") or "")
+            if u.startswith("data:") and "," in u:
+                u = u.split(",", 1)[1]          # Ollama wants raw base64, not a data: URL
+            elif not u and p.get("data"):
+                u = str(p["data"])
+            if u:
+                imgs.append(u)
+        elif t == "text":
+            text.append(str(p.get("text", "")))
+    return "\n".join(text), imgs
+
+
+def _local_model_for(payload) -> str:
+    """The model the local tier must use for THIS payload."""
+    return _LOCAL_VISION_MODEL if _has_image((payload or {}).get("messages")) else _LOCAL_MODEL_NAME
 def _gpu_vram_used_mb() -> int:
     """VRAM used (MB). Return -1 when nvidia-smi is unusable (let Ollama decide).
 
@@ -183,12 +241,12 @@ def _ollama_up() -> bool:
     except Exception:
         return False
 
-def _local_model_loaded() -> bool:
-    """True when the local model is already resident in Ollama (VRAM gate is about
+def _local_model_loaded(name: str = "") -> bool:
+    """True when that local model is already resident in Ollama (the VRAM gate is about
     *loading* under contention — a resident model is fine even if VRAM is full)."""
     try:
         out = urlopen("http://127.0.0.1:11434/api/ps", timeout=5).read()
-        return _LOCAL_MODEL_NAME.encode() in out
+        return (name or _LOCAL_MODEL_NAME).encode() in out
     except Exception:
         return False
 
@@ -441,8 +499,18 @@ def _call_ollama(payload: dict, tier: str) -> dict:
     Output cap precedence: caller-specified > forced-local default > Jev length decision.
     """
     cfg = TIERS[tier]
-    last_msg = payload["messages"][-1]["content"]
-    text = last_msg if isinstance(last_msg, str) else json.dumps(last_msg)
+    last = payload["messages"][-1]
+    last_msg = last.get("content")
+    if isinstance(last_msg, str):
+        text, images = last_msg, []
+    else:
+        text, images = _split_multimodal(last)
+        if not text.strip():
+            # No text part at all: keep the caller's payload visible rather than sending an
+            # empty prompt (an empty prompt made a vision model answer about nothing).
+            text = json.dumps([p for p in last_msg if isinstance(p, dict) and p.get("type") == "text"]
+                              or last_msg)[:2000]
+    model = _local_model_for(payload)
     if payload.get("max_tokens"):
         npred, len_class = int(payload["max_tokens"]), "caller"
     elif payload.get("_forced_local"):
@@ -455,8 +523,9 @@ def _call_ollama(payload: dict, tier: str) -> dict:
     # non-thinking model (cap 96 -> answer truncated mid-sentence, done_reason=length).
     npred = max(npred, 160)
     llm_payload = {
-        "model": cfg["model"],
+        "model": model,
         "prompt": text,
+        **({"images": images} if images else {}),
         "stream": False,
         "keep_alive": "3m",  # 3m: VRAM frees when idle. Was 30m — that plus the 6-min keepalive
                              # cron prewarm held most of the card's VRAM permanently (measured
@@ -472,7 +541,8 @@ def _call_ollama(payload: dict, tier: str) -> dict:
     content, think_stripped = _strip_think(content)
     return {"choices": [{"message": {"role": "assistant", "content": content},
                          "finish_reason": "stop"}],
-            "model": cfg["model"],
+            "model": model,
+            "x-local-vision": bool(images),
             "x-len-class": len_class, "x-num-predict": npred,
             "x-think-stripped": think_stripped,
             "x-done": resp.get("done_reason"),
@@ -740,6 +810,7 @@ class RouterHandler(BaseHTTPRequestHandler):
                          or any(re.search(p, sens_blob) for p in PRIVATE_RE))
         # body_tier must be defined here (it's also used later by PPLX pre-route)
         body_tier = (body.get("tier") or (self.headers.get("x-tier") or "").strip()).lower()
+        _img_req = _has_image(body.get("messages"))
         result_forced_local = False
         if has_sensitive and body_tier not in ("local",):
             tier = "local"
@@ -755,6 +826,15 @@ class RouterHandler(BaseHTTPRequestHandler):
             tier = body_tier
             confidence = 1.0
             tier_source = "explicit"
+
+        # ── IMAGE GUARD: a vision request never goes to a text tier ──────
+        # measured 2026-09-23: a real 512x512 PNG was classified `local` (a short, simple prompt),
+        # and the local call stringified the image into the prompt — so the answer was invented
+        # from base64. Images go to the vision tier. An explicit `tier=local` (or the privacy
+        # guard) still keeps them home, where they are now served by the local VL model.
+        if _img_req and not result_forced_local and body_tier not in ("local", "vision"):
+            tier, confidence, tier_source = "vision", max(confidence, 0.9), "guard:image"
+            guard_hits.append("image:->vision")
 
         # ── FACTUAL GUARD: real-world facts never go to the local 4B ──────
         # A 4B cannot know facts and will invent them (audit: a "what is Hong Kong's population?" question -> local).
@@ -845,7 +925,7 @@ class RouterHandler(BaseHTTPRequestHandler):
         elif body_tier in ("research", "pplx"):
             tier = "research"
             confidence = 1.0
-        elif not body_tier and (
+        elif not body_tier and not _img_req and (
                 (tier in ("pro", "premium", "flash") and (hit_fact or hit_judge))
                 # explicit verification / live-data wording overrides even a local classification:
                 # a local 4B cannot verify facts and invents them; length-heuristic judgement queries do not override local.
@@ -893,7 +973,7 @@ class RouterHandler(BaseHTTPRequestHandler):
         # after boot / after the 30m keep-alive expired). If another GPU workload is
         # VRAM at that moment, loading local would silently CPU-run (slow) or
         # OOM. Fail-closed for forced-local; degrade to flash for ordinary local.
-        if tier == "local" and not _local_model_loaded():
+        if tier == "local" and not _local_model_loaded(_local_model_for(body)):
             vram = _gpu_vram_used_mb()
             if vram > LOCAL_VRAM_USED_MAX_MB:
                 if result_forced_local:
@@ -903,7 +983,9 @@ class RouterHandler(BaseHTTPRequestHandler):
                                             "— NO cloud fallback for private request",
                                             "hint": "free VRAM (ollama: unload models the tiers no longer use), "
                                                     "or prewarm %s; threshold=%dMB used=%dMB"
-                                                    % (_LOCAL_MODEL_NAME, LOCAL_VRAM_USED_MAX_MB, vram)})
+                                                    % (_local_model_for(body), LOCAL_VRAM_USED_MAX_MB, vram),
+                                            "x-route": tier, "x-forced-local": True,
+                                            "x-source": tier_source, "x-guard": guard_hits or None})
                 tier = "flash"
                 tier_source = "guard:vram"
                 guard_hits.append("vram:%dMB>%dMB" % (vram, LOCAL_VRAM_USED_MAX_MB))
@@ -916,12 +998,16 @@ class RouterHandler(BaseHTTPRequestHandler):
             # If tier fails, try flash as fallback — EXCEPT forced-local:
             # private/sensitive traffic must NEVER go to the cloud.
             if result_forced_local:
-                return self._json(503, {"error": f"local: {e}. Forced-local request: NOT falling back to cloud."})
+                return self._json(503, {"error": f"local: {e}. Forced-local request: NOT falling back to cloud.",
+                                        "x-route": tier, "x-forced-local": True,
+                                        "x-source": tier_source, "x-guard": guard_hits or None})
             try:
                 result = _call_chain(body, "flash")
                 tier = "flash(fallback)"
             except Exception as e2:
-                return self._json(502, {"error": f"{tier}: {e}, flash fallback: {e2}"})
+                return self._json(502, {"error": f"{tier}: {e}, flash fallback: {e2}",
+                                        "x-route": tier, "x-forced-local": result_forced_local,
+                                        "x-source": tier_source, "x-guard": guard_hits or None})
 
         result["x-route"] = tier
         result["x-leg"] = result.get("leg")          # go / zen / nvidia — shows at a glance whether the subscription leg was used

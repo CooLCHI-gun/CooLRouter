@@ -124,7 +124,9 @@ Beneath the tiers sits a condition every request must satisfy before it may be c
 In practice, the critique skills at Tier 5 are the last stop before a result may be called done.
 
 Perception — image, frame, screenshot — is treated as a routing cue, not an afterthought, and held
-to the same standard of verification as any text.
+to the same standard of verification as any text. A request carrying an image is routed by a
+dedicated image guard instead of being trusted to the text classifier; a privacy-forced request
+stays home and is served by a local vision model, never by a text model reading base64 as prose.
 
 ## What I deliberately decline
 
@@ -142,9 +144,9 @@ Each arrangement substitutes a shinier alternative — declined, usually for cos
 
 ```
 .
-├── assets/        architecture.svg · demo.gif · social.mp4 · promo.mp4 · og-image.png
+├── assets/        architecture.svg · router-decision-chain.svg · demo.gif · routing-flow.gif · social.mp4 · promo.mp4 · og-image.png
 ├── config/        environment config sample (values redacted, shape kept)
-├── router/        router-proxy.py — the routing core, plus its own README
+├── router/        router-proxy.py — the routing core · router-conformance.py · test-router-p0.py
 ├── skills/        sample skill entries — the pattern, not the content
 ├── docs/          router-architecture.md (deep dive) · sonar-review · working notes
 ├── README.md      this file (English canonical)
