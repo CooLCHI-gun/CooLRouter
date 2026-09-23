@@ -208,7 +208,7 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 | **P1** | 重建回應時 `tool_calls` 被靜默丟棄（工具呼叫經 router 會失效） | 保留 `tool_calls`，`finish_reason` 如實反映 | 帶 `tool_calls` 的回應完整往返 |
 | **P1** | Windows 上預設 `allow_reuse_address` 容許**第二個** instance 綁同一 port：兩個 router 交錯服務、狀態分歧，而且「修復看似無效」其實是被舊 instance 服務 | `allow_reuse_address = False`，第二個 instance 直接失敗 | 修復前實測兩個 PID 同時 LISTENING 同一 port |
 
-完整功能測試：`cache/scratch/test-router-p0.py`（以真假上游驗證，非 mock 自身程式碼），7/7 通過。
+完整功能測試：`scripts/test-router-p0.py`（以真假上游驗證，非 mock 自身程式碼），7/7 通過。
 
 ### 9.2 仍待處理
 

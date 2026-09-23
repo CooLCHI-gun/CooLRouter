@@ -206,7 +206,8 @@ curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
 ## 9. What was broken, and what changed
 
 Found by an adversarial review (a hosted reasoning model) cross-checked line-by-line against the
-source, then fixed and re-verified with a functional test that stands up a fake upstream.
+source, then fixed and re-verified with a functional test that stands up a fake upstream
+([`router/test-router-p0.py`](router/test-router-p0.py) — 7/7 passing).
 
 | Severity | Defect | Fix | Verification |
 |---|---|---|---|
