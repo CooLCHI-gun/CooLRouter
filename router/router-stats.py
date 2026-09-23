@@ -130,6 +130,9 @@ def main():
     print()
 
     print("SPEED (ms_total, measured)")
+    print("  note: the local vision median is dominated by MODEL LOADING, not inference. On a 6 GB")
+    print("  card the text model and the VL model evict each other, so alternating requests pay a cold")
+    print("  load every time. Warm, the same local VL call answered in 0.06-0.08 s (measured 2026-09-23)")
     by_model = defaultdict(list)
     for r in rows:
         if r.get("model"):

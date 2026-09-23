@@ -33,7 +33,7 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 </p>
 
 <p align="center">
-  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#typed-decisions-jev">Typed decisions</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#measured">Measured</a> · <a href="#limitations">Limitations</a>
+  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#typed-decisions-jev">Typed decisions</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#the-cache-is-where-the-money-is">The cache</a> · <a href="#measured">Measured</a> · <a href="#limitations">Limitations</a>
 </p>
 
 > **The cheapest model that verifiably does the job is the right model.**
@@ -203,7 +203,7 @@ serves an agent through it. The response carries the routing decision in its bod
 ├── assets/        demo-routing.gif (3-act demo) · architecture.svg · router-decision-chain.svg · social.mp4 · promo.mp4 · og-image.png
 ├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes config + plugin
 ├── config/        environment config sample (values redacted, shape kept)
-├── router/        router-proxy.py — the routing core · router-conformance.py · test-router-p0.py
+├── router/        router-proxy.py · router-cache-probe.py · router-stats.py — the routing core · router-conformance.py · test-router-p0.py
 ├── skills/        sample skill entries — the pattern, not the content
 ├── docs/          router-architecture.md (deep dive) · sonar-review · working notes
 ├── README.md      this file (English canonical)
@@ -215,6 +215,42 @@ The animated assets are generated: `demo-routing.gif` (20 frames, 12.4s — one 
 decide → dispatch → deliver), `social.mp4` (7s loop), `promo.mp4` (12s Remotion cinematic),
 `architecture.svg` (6-tier diagram). Their generators live in `assets/_gen_*.py` and are
 gitignored — the source for `promo.mp4` is the full Remotion project under `promo/`.
+
+## The cache is where the money is (measured)
+
+The cloud legs bill input at **$0.15/M on a miss and $0.003/M on a hit** - a 50x gap - so the most
+expensive thing a router can do is make a prefix un-cacheable. Measured against the live legs with
+`python router/router-cache-probe.py`:
+
+| prefix | cached_tokens | hit | input cost | vs uncached |
+|:--|--:|--:|--:|--:|
+| ~232 tokens | 0 | 0% | $0.000035 | 1.0x |
+| ~285 tokens | 256 | 90% | $0.000005 | **8.4x** |
+| ~446 tokens | 384 | 86% | $0.000010 | **6.4x** |
+| ~927 tokens | 896 | 97% | $0.000007 | **18.9x** |
+| ~1837 tokens | 1792 | 98% | $0.000012 | **22.7x** |
+| ~3657 tokens | 3584 | 98% | $0.000022 | **25.3x** |
+
+Three things this establishes:
+
+1. **The floor sits around 256 tokens** (232 -> 0%, 285 -> 90%) and every cached amount is a multiple
+   of 64 - block granularity, so a prefix shorter than a few blocks can never earn the discount. A
+   one-shot prompt lives below the floor; an agent session lives far above it.
+2. **A leg switch does not lose the cache.** Same model id on both legs, so GO -> ZEN -> GO held at
+   **98% on every step**: failover is free in cache terms, while switching *model* starts again at 0.
+3. **The router's contribution is negative-space work.** It never rewrites, re-orders or stamps the
+   messages it forwards (it only reads the final turn), so a client's prefix stays byte-identical and
+   keeps hitting. Injecting per-request text into the system prompt would cost every client ~25x on
+   input - the most expensive thing a "helpful" router can do.
+
+What is *not* claimed here: the mechanism is not novel - any pass-through proxy preserves a prefix.
+What is uncommon is measuring it, publishing the floor, and shipping the probe so the table can be
+reproduced or refuted.
+
+Honest limits: one run showed a 0% hit at ~927 tokens that did not reproduce (a cache-write race - the
+repeat arrived before the write landed), so treat a single miss as noise and re-probe. The provider
+returns `cache_write_tokens: null`, so write costs cannot be reported. Prices are the recorded rates
+from the tier notes.
 
 ## Measured
 
@@ -236,9 +272,15 @@ moves money; shaving tokens does not.
 
 **Local is not slower than cloud in the median - it is just less predictable.** `gemma3:4b` answered
 in 1.86 s median against 1.99 s for the cloud flash leg, but its p90 is 15.6 s versus 6.7 s: that
-tail is model loading, not inference. Local *vision* is the honest exception - 18.9 s median for
-Qwen3-VL-4B against 1.75 s for the cloud vision model, 11x slower. Local vision is a privacy feature,
-not a speed feature.
+tail is model loading, not inference.
+
+**An earlier reading of local vision was wrong, and the correction matters.** Same image, same 48-token
+cap, three runs each: the cloud leg (ZEN, `deepseek-v4-flash-vision-exp`) took 1.34-4.63 s but spent the
+entire cap on reasoning and never stated the colour, while local Qwen3-VL-4B took 8.3 s on the first
+call (loading the model) and then **0.06-0.08 s** warm - answering "Blue" correctly. So the 18.9 s
+median in the trace is mostly model-SWAP cost, not inference: on a 6 GB card the text model and the VL
+model evict each other, and a trace full of alternating requests measures loading, not speed. Local
+vision is a privacy feature first, but on a resident model it is also the faster and more direct answer.
 
 **The primary leg never failed in this sample**: 116 of 116 cloud requests were served by the first
 leg, with zero fallbacks and zero empty completions. The classifier costs 79 ms median.

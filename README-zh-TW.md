@@ -30,7 +30,7 @@
 </p>
 
 <p align="center">
-  <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#型別化決策jev">Jev</a> · <a href="#防護機制">防護機制</a> · <a href="#部署">部署</a> · <a href="#目錄結構">目錄結構</a> · <a href="#實測數據">實測</a> · <a href="#限制說明">限制</a>
+  <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#型別化決策jev">Jev</a> · <a href="#防護機制">防護機制</a> · <a href="#部署">部署</a> · <a href="#目錄結構">目錄結構</a> · <a href="#成本核心在-cache實測">Cache</a> · <a href="#實測數據">實測</a> · <a href="#限制說明">限制</a>
 </p>
 
 > **能以最低成本完成任務、且經得起驗證的模型，就是正確的模型。**
@@ -163,7 +163,7 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 ├── assets/        demo-routing.gif（三幕演示）· 架構圖 · 決策鏈圖 · 社交影片 · 標誌
 ├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes 設定與 plugin
 ├── config/        環境配置範例（數值已遮蔽，保留結構）
-├── router/        router-proxy.py —— 路由核心，附說明與測試
+├── router/        router-proxy.py · router-cache-probe.py · router-stats.py —— 路由核心，附說明與測試
 ├── skills/        技能條目範例——呈現模式，非實際內容
 ├── docs/          router-architecture.md（深入技術說明）· sonar review · 工作筆記
 ├── README.md      英文正本
@@ -172,6 +172,37 @@ sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.p
 ```
 
 動畫素材皆為程式生成：`demo-routing.gif`（20 幀、12.4 秒，示範一個任務走過 decide → dispatch → deliver）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
+
+## 成本核心在 cache（實測）
+
+雲端 leg 嘅 input 收費係 **miss $0.15/M、hit $0.003/M** — 相差 50 倍 — 所以一個 router 最貴嘅行為就係
+令 prefix 無法 cache。以下用 `python router/router-cache-probe.py` 對真實 leg 實測：
+
+| prefix | cached_tokens | 命中 | input 成本 | 對比無 cache |
+|:--|--:|--:|--:|--:|
+| ~232 tokens | 0 | 0% | $0.000035 | 1.0x |
+| ~285 tokens | 256 | 90% | $0.000005 | **8.4x** |
+| ~446 tokens | 384 | 86% | $0.000010 | **6.4x** |
+| ~927 tokens | 896 | 97% | $0.000007 | **18.9x** |
+| ~1837 tokens | 1792 | 98% | $0.000012 | **22.7x** |
+| ~3657 tokens | 3584 | 98% | $0.000022 | **25.3x** |
+
+這張表確立三件事：
+
+1. **門檻約在 256 tokens**（232 → 0%、285 → 90%），而且每個 cached 值都是 64 的倍數 — 即 block 粒度，
+   所以短於幾個 block 的 prefix 永遠拿不到折扣。一次性 prompt 在門檻之下，agent session 遠在門檻之上。
+2. **切換 leg 不會失去 cache。** 兩條 leg 是同一個 model id，因此 GO → ZEN → GO 每一步都維持 **98%**：
+   failover 在 cache 層面是免費的；但切換 **model** 就要從 0 重新開始。
+3. **路由器嘅貢獻係「負空間」工作。** 它從不改寫、重排或蓋章於轉發嘅 messages（只讀最後一輪），
+   所以客戶端嘅 prefix 保持 byte-identical 而持續命中。任何 per-request 注入 system prompt 嘅做法，
+   都會令每個客戶端在 input 上多付約 25 倍 — 呢個係一個「好心」嘅 router 可以做嘅最貴行為。
+
+**唔宣稱嘅事**：機制本身唔新穎 — 任何 passthrough proxy 都會保留 prefix。罕見嘅係把它量出來、公佈門檻，
+並且附上 probe 令這張表可被重現或推翻。
+
+誠實限制：有一次 ~927 tokens 出現 0% 命中且無法重現（cache 寫入競態 — 重打時寫入尚未落地），
+所以單次 miss 應視為雜訊、需重測。上游 `cache_write_tokens` 一律回 null，寫入成本無法報告。
+價格採用 tier 文件所記錄嘅費率。
 
 ## 實測數據
 
@@ -190,8 +221,14 @@ research 呼叫每次都有 $0.005–$0.014 的 search floor，合計 **$0.105�
 200–500 倍。真正影響支出的是「用 guard 擋住 research」，而不是壓縮 token。
 
 **local 的中位數並不比雲端慢，只是更不穩定。** `gemma3:4b` 中位數 1.86 秒，雲端 flash 為 1.99 秒；
-但 p90 是 15.6 秒對 6.7 秒 — 尾部來自模型載入，而非推理。本地 **vision** 是誠實的例外：
-Qwen3-VL-4B 中位數 18.9 秒，雲端 vision 模型 1.75 秒，慢 11 倍。本地 vision 是私隱功能，不是速度功能。
+但 p90 是 15.6 秒對 6.7 秒 — 尾部來自模型載入，而非推理。
+
+**早前對本地 vision 的讀數是錯的，而這個修正很重要。** 同一張圖、同一個 48-token cap、各跑三次：
+雲端 leg（ZEN，`deepseek-v4-flash-vision-exp`）用 1.34–4.63 秒，但把整個 cap 燒在 reasoning 上，
+從未講出顏色；本地 Qwen3-VL-4B 第一次 8.3 秒（載入模型），之後 warm 只需 **0.06–0.08 秒**，
+並正確答出「Blue」。所以 trace 裡的 18.9 秒中位數主要是**模型切換**成本，而非推理：在 6 GB 卡上
+文字模型與 VL 模型會互相驅逐，一份交替請求的 trace 量到的是載入，不是速度。本地 vision 首先是私隱功能，
+但在模型已常駐時，它同時是更快、更直接的答案。
 
 **此樣本中主要 leg 從未失敗**：116/116 次雲端請求都由第一條 leg 完成，零 fallback、零空回答。
 分類器中位數 79 毫秒。
