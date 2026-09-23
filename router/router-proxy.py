@@ -38,12 +38,12 @@ if os.path.exists(_env_profile):
 
 # ── VRAM guard ─────────────────────────────────────────────────────
 # A 6 GB GPU: the local model needs ~3.4GB VRAM. If another GPU workload
-# (a game, a render) is hogging VRAM, loading local would silently fall
+# is using most of the card, loading the local model would silently fall
 # back to CPU (slow). Fail-closed for forced-local (private) traffic; for
 # ordinary local-classified queries, degrade to flash instead.
 LOCAL_VRAM_USED_MAX_MB = 4500
 # LOCAL MODEL = NON-THINKING INSTRUCT (measured 2026-09-22). A reasoning distill spends the
-# entire Jev token cap inside its "Thinking Process:" preamble: the local 4B model with cap 320 emitted
+# entire Jev token cap inside its "Thinking Process:" preamble: the local model with cap 320 emitted
 # 912 chars of CoT, done_reason=length, i.e. ZERO answer. gemma3:4b answers the same prompt in
 # 1.6 s / 60 tokens / done=stop. The cap only works on a model that does not think out loud.
 _LOCAL_MODEL_NAME = "gemma3:4b"
@@ -72,7 +72,7 @@ def _gpu_vram_used_mb() -> int:
 # prefix-cache HIT at $0.003/M vs $0.15/M for a MISS (off-peak) — a 50x difference on input.
 _TRACE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs", "router-trace.jsonl")
 _STATS = {"by_tier": {}, "cache": {"prompt_tokens": 0, "cached_tokens": 0, "hits": 0, "misses": 0},
-          "pins": 0, "jev_guards": 0, "jev_fail": 0}
+          "pins": 0, "jev_guards": 0, "jev_fail": 0, "jev_calls": 0}
 # One global lock for the shared mutable state (_STATS, _SESSION_PIN, _LEG_COOLDOWN, trace writes).
 # The server is threaded (2026-09-23), so unsynchronised read-modify-write would lose counters and
 # could let two requests race the same leg. Critical sections stay short — never hold it over I/O.
@@ -125,7 +125,8 @@ def _health_stats() -> dict:
                     "completion_tokens": v["completion_tokens"]}
     c = _STATS["cache"]
     return {"tiers": tiers, "pins": _STATS["pins"], "jev_guards": _STATS["jev_guards"],
-            "jev_fail": _STATS["jev_fail"], "session_pins_live": len(_SESSION_PIN),
+            "jev_fail": _STATS["jev_fail"], "jev_calls": _STATS["jev_calls"],
+            "session_pins_live": len(_SESSION_PIN),
             "cache": {**c, "hit_rate": round(c["cached_tokens"] / c["prompt_tokens"], 3)
                       if c["prompt_tokens"] else None},
             "trace_path": _TRACE_PATH}
@@ -183,7 +184,7 @@ def _ollama_up() -> bool:
         return False
 
 def _local_model_loaded() -> bool:
-    """True when the local 4B model is already resident in Ollama (VRAM gate is about
+    """True when the local model is already resident in Ollama (VRAM gate is about
     *loading* under contention — a resident model is fine even if VRAM is full)."""
     try:
         out = urlopen("http://127.0.0.1:11434/api/ps", timeout=5).read()
@@ -192,10 +193,10 @@ def _local_model_loaded() -> bool:
         return False
 
 # ── Tier configs ─────────────────────────────────────────────────────
-# opencode 兩條腿：GO = 月費訂閱（先用）, ZEN = 按量付費（GO quota 用完才 fallback）
+# opencode has two legs: GO = monthly subscription (tried first), ZEN = pay-per-use (fallback once GO quota runs out)
 _OC_GO = "https://opencode.ai/zen/go/v1/chat/completions"
 _OC_ZEN = "https://opencode.ai/zen/v1/chat/completions"
-# 實測 2026-09-20：GO 冇 x-opencode-session → HTTP 400 MissingSessionID；帶住就通。
+# measured 2026-09-20: GO without x-opencode-session → HTTP 400 MissingSessionID; sending the header works.
 _OC_HDRS = {"x-opencode-session": "hermes-router"}
 
 def _leg(url, model, key_env, kind="opencode"):
@@ -205,32 +206,32 @@ _GO_FLASH = _leg(_OC_GO, "deepseek-v4.1-flash", "OPENCODE_GO_API_KEY")
 _ZEN_FLASH = _leg(_OC_ZEN, "deepseek-v4.1-flash", "OPENCODE_ZEN_API_KEY")
 
 TIERS = {
-    # ① PRIVATE-FIRST — 本機 4B。私密/PII 流量 fail-closed，永遠唔上雲。
+    # (1) PRIVATE-FIRST — local 4B. private/PII traffic is fail-closed and never goes to the cloud.
     "local": {
         "url": "http://127.0.0.1:11434/api/generate",
         "model": _LOCAL_MODEL_NAME,
         "provider": "ollama",
         "note": "private-first；non-thinking instruct（cap 才有效）；VRAM 緊張時普通請求降 flash，forced-local fail-closed",
     },
-    # ② DEFAULT — DeepSeek v4.1 flash。GO 月費先用 → 冇 quota 自動跳 ZEN（同一個 model id）。
+    # (2) DEFAULT — DeepSeek v4.1 flash. GO subscription first → ZEN once the quota is out (same model id).
     "flash": {
         "chain": [_GO_FLASH, _ZEN_FLASH],
         "note": "default；go(月費) → zen fallback，同一個 model id（deepseek-v4.1-flash）",
     },
-    # ⑥ META — classifier 嘅「問路由／問自己能力」class，冇獨立能力，行為跟 default。
+    # (6) META — the classifier's "asks about routing / own capability" class; no capability of its own, behaves as default.
     "meta": {
         "chain": [_GO_FLASH, _ZEN_FLASH],
         "note": "唔係獨立能力，只係 classifier class → 同 flash 同一條鏈",
     },
-    # pro／premium 已刪（2026-09-20）：DeepSeek v4.1 flash 能力已經足夠，冇必要再養貴 tier。
-    # classifier 仍然會出 "pro"／"premium" class → DISPATCH 搵唔到 → 自動 fallback 去 default
-    # （flash chain），零額外成本、零 surprise。想要返貴模型就喺呢度加返一個 chain。
-    # ③ VISION — 三條腿，順序係有原因，唔係一時一樣：
-    #   ① go   deepseek-v4-flash-vision-exp → 同 Hermes auxiliary.vision 同一個模型
-    #      （OCR／文件／圖表水準一致，兩邊唔會答得唔同）
-    #   ② zen  同一個模型 → quota 用完都照樣睇到圖
-    #   ③ nvidia nemotron-3-nano-omni → 免費後備，前兩條死咗都仲有得睇
-    #   註：本地 vision（Ollama gemma3:4b / qwen3.5:4b / gemma-4-E2B）只作完全離線時用。
+    # pro/premium removed (2026-09-20): DeepSeek v4.1 flash is capable enough, so a costly tier is
+    # not worth keeping. The classifier still emits "pro"/"premium" → no DISPATCH entry → automatic
+    # fallback to the flash chain, zero extra cost and no surprise. Add a chain here to restore one.
+    # (3) VISION — three legs, and the order is deliberate, not arbitrary:
+    #   (1) go     deepseek-v4-flash-vision-exp → the same model Hermes auxiliary.vision uses
+    #      (identical OCR/document/chart quality, so the two never disagree)
+    #   (2) zen    same model → images still work once the quota is gone
+    #   (3) nvidia nemotron-3-nano-omni → free backup, still works if the first two die
+    # note: local vision (Ollama gemma3:4b / qwen3.5:4b / gemma-4-E2B) is for fully offline use only.
     "vision": {
         "chain": [_leg(_OC_GO, "deepseek-v4-flash-vision-exp", "OPENCODE_GO_API_KEY"),
                   _leg(_OC_ZEN, "deepseek-v4-flash-vision-exp", "OPENCODE_ZEN_API_KEY"),
@@ -239,17 +240,17 @@ TIERS = {
                        kind="nvidia")],
         "note": "go/zen = deepseek-v4-flash-vision-exp（同 Hermes aux vision 一致）, nvidia = 免費後備",
     },
-    # ④ VOICE — 本地 edge-tts。
-    #    誠實聲明：呢個 tier 只會回一句 placeholder 字串，唔會出音檔；
-    #    真正出聲要用 Hermes 內建 TTS（text_to_speech 工具 / config.yaml tts 區）。
+    # (4) VOICE — local edge-tts.
+    #    honest note: this tier returns only a placeholder string, never an audio file;
+    #    real speech needs the built-in Hermes TTS (text_to_speech tool / config.yaml tts section).
     "voice": {
         "url": None,  # handled locally
         "model": "edge-tts",
         "provider": "local-tts",
         "note": "本地 edge-tts placeholder（唔回音檔）",
     },
-    # ⑦ RESEARCH — Perplexity。每次 call 都有 search-context floor（約 $0.005–0.014），
-    #    所以只喺「真需要外部即時資料／核實具體事實」先開，keyword 要準（見 do_POST gate）。
+    # (7) RESEARCH — Perplexity. Every call carries a search-context floor (~$0.005–0.014), so it
+    #    opens only when live external data or fact verification is genuinely needed (see the do_POST gate).
     "research": {
         "url": "https://api.perplexity.ai/chat/completions",
         "model": "sonar-pro",
@@ -259,21 +260,21 @@ TIERS = {
         "note": "sonar-pro 預設（平、有 citation）；判斷／長查詢升 sonar-reasoning-pro",
     },
 }
-# 註：「video」tier 已刪（2026-09-20）。睇片（analysis）要用 Hermes 內建 video_analyze
-#     （Gemini，≤50MB），router 只收 chat-completions 文字 payload，帶唔到片；
-#     影片生成要另開 API。classifier 仍會出 "video" class → DISPATCH 查唔到會 fallback flash。
+# note: the "video" tier was removed (2026-09-20). Video analysis needs the built-in Hermes
+#     video_analyze (Gemini, ≤50MB): the router accepts text chat-completions payloads only and
+#     cannot carry video; generation needs a separate API. A "video" class still falls back to flash.
 
 def _get_api_key(tier_cfg: dict) -> str:
     env_var = tier_cfg.get("api_key_env", "")
     return os.environ.get(env_var, "")
 
-# ── Jev：判斷「答案應該幾長」→ 修本地 4B 口水多嘅問題 ──────────────
-# 實測（2026-09-21）：the local 4B model 係 reasoning-distill，一個「用一句話講解」嘅問題
-# 生成 1,688 token / 4,054 字 = 25 秒；Ollama 本身有 68.6 tok/s，即係慢嘅原因係
-# 「生成太多」而唔係「跑得慢」。加 cap 之後：120 token → 1.93s、60 token → 1.04s。
-# 所以用 Jev 一個 choice 問題（~0.4s、$0.00003）判斷長度類 → 設 num_predict。
-# ⚠️ Jev 係雲端服務 → forced-local（私密／PII）流量絕對唔可以交俾佢分類，
-#    私密請求直接用預設上限（_JEV_DEFAULT），唔會漏一個字出街。
+# ── Jev: decide how long the answer should be → fixes the local 4B's verbosity ──
+# measured (2026-09-21): the local model is a reasoning distill, so an "explain in one sentence"
+# question produced 1,688 tokens / 4,054 chars = 25 s; Ollama itself runs at 68.6 tok/s, meaning
+# the slowness was over-generation, not a slow runtime. With a cap: 120 tokens → 1.93s, 60 → 1.04s.
+# So one Jev choice question (~0.4s, $0.00003) classifies the length bucket → sets num_predict.
+# ⚠️ Jev is a cloud service → forced-local (private/PII) traffic must never be handed to it for
+#    classification; private requests use the default cap (_JEV_DEFAULT) and leak nothing.
 _JEV_LEN = {"one-line": 96, "short": 320, "detailed": 1200}
 _JEV_DEFAULT = 384
 
@@ -294,7 +295,7 @@ def _jev_key() -> str:
 
 
 def _jev_len_class(text: str) -> str:
-    """回 'one-line' | 'short' | 'detailed'；失敗／冇 key → 'short'（安全預設）。"""
+    """Return 'one-line' | 'short' | 'detailed'; on failure or a missing key → 'short' (safe default)."""
     key = _jev_key()
     if not key:
         return "short"
@@ -344,6 +345,66 @@ def _jev_guards(text: str):
         return None, None
 
 
+# ── Jev merged call (2026-09-23) ─────────────────────────────────────
+# Both Jev jobs run on the SAME request class (local/meta, not forced-local), so two separate
+# POSTs were paying two round-trips (~0.3-0.5 s each) on the tier that is supposed to be the
+# fast one. Measured: a warm local answer takes 1.4-2.3 s, so the second round-trip was a
+# 30-70% latency tax on the fastest tier. One request now answers every question needed.
+# Instructions are in English: English is the best-served language for this model, and the
+# world-knowledge question must explicitly exclude computation — it scored 0.9 on "what is 2+2"
+# and escalated pure arithmetic to a paid cloud tier.
+_PURE_CALC = re.compile(
+    r"^\s*(?=.*\d)(?=.*[+\-*/×÷^%])"
+    r"(?:what(?:'s| is)|calculate|compute|solve|how much is|幾多|多少)?\s*"
+    r"[\d\s.+\-*/()×÷^%]+[\s=?]*(?:equals)?[\s=?]*$", re.I)
+
+
+def _jev_decide(text: str, want_len: bool = False, want_guards: bool = False) -> dict:
+    """One Jev request for every question needed -> {'len':.., 'wk':.., 'cit':..}.
+
+    Missing/failed answers are simply absent from the dict, so callers fall back to their own
+    defaults. Never raises. Cloud call: never pass forced-local (private) text.
+    """
+    key = _jev_key()
+    if not key or not (want_len or want_guards):
+        return {}
+    q = {}
+    if want_len:
+        q["len"] = {"type": "choice",
+                    "instructions": "How long should the answer to this request be?",
+                    "criteria": {
+                        "one-line": "a single sentence, one number, yes/no, or a single name",
+                        "short": "a few sentences up to one paragraph",
+                        "detailed": "needs detailed explanation, steps, code, or long analysis"}}
+    if want_guards:
+        q["wk"] = {"type": "noul",
+                   "instructions": ("Does answering this question accurately require real-world "
+                                    "facts (numbers, dates, people, prices)? Pure arithmetic or "
+                                    "computation that needs no external facts does NOT count.")}
+        q["cit"] = {"type": "noul",
+                    "instructions": ("Is the user explicitly asking for sources, verification, "
+                                     "or the latest information?")}
+    body = {"model": "typesafe/jev-1.13", "state": text[:1500], "questions": q}
+    try:
+        req = Request("https://openrouter.ai/api/alpha/decisions", json.dumps(body).encode(),
+                      {"Content-Type": "application/json", "Authorization": "Bearer " + key})
+        d = json.loads(urlopen(req, timeout=20).read())
+        a = d.get("answers") or {}
+        out = {}
+        if want_len:
+            out["len"] = (a.get("len") or {}).get("choice")
+        if want_guards:
+            out["wk"] = (a.get("wk") or {}).get("noul")
+            out["cit"] = (a.get("cit") or {}).get("noul")
+        with _LOCK:
+            _STATS["jev_calls"] += 1
+        return out
+    except Exception:
+        with _LOCK:
+            _STATS["jev_calls"] += 1
+        return {}
+
+
 _THINK_HDR_RE = re.compile(r"^\s*(thinking process|thinking|reasoning|思考過程|分析過程)\s*[:：]", re.I)
 _FINAL_MARK_RE = re.compile(r"(?im)^\s*\**\s*(final answer|answer|結論|答案)\s*\**\s*[:：]")
 
@@ -377,7 +438,7 @@ def _strip_think(content: str):
 def _call_ollama(payload: dict, tier: str) -> dict:
     """Call Ollama /api/generate. Handles thinking field for reasoning models.
 
-    輸出上限優先次序：caller 指定 > forced-local 預設 > Jev 長度判斷。
+    Output cap precedence: caller-specified > forced-local default > Jev length decision.
     """
     cfg = TIERS[tier]
     last_msg = payload["messages"][-1]["content"]
@@ -387,17 +448,18 @@ def _call_ollama(payload: dict, tier: str) -> dict:
     elif payload.get("_forced_local"):
         npred, len_class = _JEV_DEFAULT, "forced-local(default)"
     else:
-        len_class = _jev_len_class(text[:1500])
+        _pre = payload.get("_jev") or {}
+        len_class = _pre.get("len") or _jev_len_class(text[:1500])
         npred = _JEV_LEN.get(len_class, _JEV_DEFAULT)
     # FLOOR (measured 2026-09-22): below ~128 tokens the answer is cut mid-sentence even on a
-    # non-thinking model (cap 96 -> "…避免預先設計或開發你唔會用嘅嘢。（" done_reason=length).
+    # non-thinking model (cap 96 -> answer truncated mid-sentence, done_reason=length).
     npred = max(npred, 160)
     llm_payload = {
         "model": cfg["model"],
         "prompt": text,
         "stream": False,
         "keep_alive": "3m",  # 3m: VRAM frees when idle. Was 30m — that plus the 6-min keepalive
-                             # cron prewarm pinned 5.0GB of the 6.1GB card permanently (measured
+                             # cron prewarm held most of the card's VRAM permanently (measured
                              # 2026-09-22: 5593MiB used idle vs 551MiB after unload) and starved
                              # games/capture. Cold start costs 27s (measured) — acceptable for a
                              # tier that only serves private/short prompts.
@@ -419,12 +481,12 @@ def _call_ollama(payload: dict, tier: str) -> dict:
                       "prompt_tokens_details": {"cached_tokens": 0}}}
 
 # ── Legs & chain ─────────────────────────────────────────────────────
-# 一個 tier 可以係一條 chain（多條腿，順序試）。腿 = opencode 或 nvidia。
+# a tier can be a chain (several legs, tried in order). a leg = opencode or nvidia.
 _LEG_COOLDOWN = {}          # {key|url: until_ts}
 _QUOTA_HINTS = ("quota", "insufficient", "credit", "balance", "rate limit",
                 "too many requests", "usage limit", "exceeded", "missing session")
-COOLDOWN_QUOTA = 900        # quota 用盡：15 分鐘唔再撞同一條腿
-COOLDOWN_ERROR = 60         # 其他錯誤：短暫跳過
+COOLDOWN_QUOTA = 900        # quota exhausted: skip that leg for 15 minutes
+COOLDOWN_ERROR = 60         # other errors: brief skip
 
 def _leg_key(leg: dict) -> str:
     return leg["api_key_env"] + "|" + leg["url"]
@@ -434,6 +496,11 @@ def _looks_like_quota(msg: str) -> bool:
     return any(h in m for h in _QUOTA_HINTS)
 
 def _call_leg(payload: dict, leg: dict, timeout: int = 120) -> dict:
+    # Never forward internal bookkeeping keys upstream. Providers reject unknown parameters —
+    # measured 2026-09-23: the vision leg returned HTTP 400 "Unsupported parameter(s):
+    # `_forced_local`", which broke the ENTIRE vision tier (every image request failed, and the
+    # legs then sat in cooldown). Keys prefixed with "_" are ours: _forced_local, _jev.
+    payload = {k: v for k, v in payload.items() if not k.startswith("_")}
     key = os.environ.get(leg["api_key_env"], "")
     if not key:
         raise RuntimeError(f"{leg['api_key_env']} not set")
@@ -442,7 +509,7 @@ def _call_leg(payload: dict, leg: dict, timeout: int = 120) -> dict:
                "User-Agent": "OpenAI/Python",
                "Accept": "application/json"}
     if leg.get("kind") == "opencode":
-        headers.update(_OC_HDRS)          # GO 冇 x-opencode-session → 400
+        headers.update(_OC_HDRS)          # GO without x-opencode-session → 400
     body = dict(payload, model=leg["model"])
     req = Request(leg["url"], json.dumps(body).encode(), headers)
     try:
@@ -463,13 +530,13 @@ def _call_leg(payload: dict, leg: dict, timeout: int = 120) -> dict:
         # HTTP 200 with EMPTY content is a FAILURE, not a success (fixed 2026-09-23): without this
         # the caller receives a blank answer and the chain never tries the next leg.
         raise RuntimeError(f"empty content from {leg['model']} (HTTP 200)")
-    # leg 標籤（go/zen/nvidia）— 方便一眼睇到究竟有冇用到月費嗰條腿
+    # leg label (go/zen/nvidia) — shows at a glance whether the subscription leg was used
     url = leg["url"] or ""
     label = ("go" if "/go/" in url else "zen" if "opencode.ai" in url
              else "nvidia" if "nvidia" in url else "direct")
     out_msg = {"role": "assistant", "content": content}
     if tool_calls:
-        out_msg["tool_calls"] = tool_calls      # 保留 tool call，唔好靜靜咁丟棄
+        out_msg["tool_calls"] = tool_calls      # keep tool calls; never drop them silently
     return {"choices": [{"message": out_msg,
                          "finish_reason": "tool_calls" if tool_calls else "stop"}],
             "usage": resp.get("usage", {}),
@@ -477,7 +544,7 @@ def _call_leg(payload: dict, leg: dict, timeout: int = 120) -> dict:
             "leg": label}
 
 def _call_chain(payload: dict, tier: str) -> dict:
-    """順序試每條腿：GO（月費）先用，quota 死 → ZEN，再死 → 免費後備（vision 用 nvidia）。"""
+    """Try each leg in order: GO (subscription) first, then ZEN when the quota dies, then the free backup (nvidia for vision)."""
     cfg = TIERS[tier]
     legs = cfg.get("chain") or [cfg]
     last = None
@@ -490,9 +557,21 @@ def _call_chain(payload: dict, tier: str) -> dict:
             return _call_leg(payload, leg)
         except Exception as e:
             last = e
+            # A request-shaped error (HTTP 400/422, a validation rejection) means THIS payload
+            # was unacceptable — the leg is healthy. Cooldown is for legs that are DOWN. Without
+            # this distinction one unserviceable request (measured 2026-09-23: an image the
+            # provider could not decode) put the flash legs in a 60 s cooldown and made every
+            # later flash request return 502.
+            _es = str(e)
+            _req_shaped = any(t in _es for t in (
+                "400", "422", "Unsupported parameter", "Validation", "Bad Request",
+                "invalid_request", "Failed to load image", "Failed to decoding"))
             with _LOCK:
-                _LEG_COOLDOWN[k] = time.time() + (
-                    COOLDOWN_QUOTA if _looks_like_quota(str(e)) else COOLDOWN_ERROR)
+                if _req_shaped:
+                    _LEG_COOLDOWN.pop(k, None)
+                else:
+                    _LEG_COOLDOWN[k] = time.time() + (
+                        COOLDOWN_QUOTA if _looks_like_quota(_es) else COOLDOWN_ERROR)
     raise last or RuntimeError(f"all legs failed for tier {tier}")
 
 def _call_local_tts(payload: dict, tier: str = "voice") -> dict:
@@ -507,10 +586,10 @@ def _call_local_tts(payload: dict, tier: str = "voice") -> dict:
                          "finish_reason": "stop"}],
             "model": "edge-tts"}
 
-# ── Research tier（Perplexity）────────────────────────────────────────
-# 預設 sonar-pro（平、一定有 citation）；判斷／長查詢才升 sonar-reasoning-pro（CoT 貴）。
-# EMPTY-PROOF（跟 pplx-review.py 嘅血淚）：CoT 版會燒晒 max_tokens 偷偷諗嘢然後回
-# 200 OK + 空 content → 要有 max_tokens floor，空就加 cap 重試一次，再空就降 sonar-pro。
+# ── Research tier (Perplexity) ────────────────────────
+# defaults to sonar-pro (cheap, always cites); judgement/long queries upgrade to sonar-reasoning-pro (CoT is costly).
+# EMPTY-PROOF (lessons from pplx-review.py): the CoT model burns all of max_tokens thinking, then returns
+# 200 OK with empty content → keep a max_tokens floor, retry once with a bigger cap, then drop to sonar-pro.
 _PPLX_REASON_RE = re.compile(
     r"\b(compare|which is better|pros and cons|evaluate|review|difference|impact|why)\b"
     r"|邊個好|應該揀|評估|比較|影響", re.I)
@@ -533,7 +612,7 @@ def _pplx_once(cfg: dict, key: str, payload: dict, model: str, max_tokens: int):
     return (msg.get("content") or msg.get("reasoning_content") or "").strip(), resp
 
 def _call_pplx(payload: dict, tier: str = "research") -> dict:
-    """Call Perplexity Sonar（OpenAI-compatible）+ citations。Never returns empty silently."""
+    """Call Perplexity Sonar (OpenAI-compatible) + citations. Never returns empty silently."""
     cfg = TIERS.get(tier) or TIERS["research"]
     key = _get_api_key(cfg)
     if not key:
@@ -559,13 +638,13 @@ def _call_pplx(payload: dict, tier: str = "research") -> dict:
 DISPATCH = {
     "local": _call_ollama,
     "flash": _call_chain,
-    "meta": _call_chain,      # classifier class，同 default 同一條鏈
-    "vision": _call_chain,    # go → zen → nvidia(免費)
+    "meta": _call_chain,      # classifier class; same chain as default
+    "vision": _call_chain,    # go → zen → nvidia (free)
     "voice": _call_local_tts,
     "research": _call_pplx,
-    "pplx": _call_pplx,       # 舊名，保留相容
-    # 註：classifier 仍會出 "pro"／"premium"／"video" class → 呢度冇 key → do_POST 即刻
-    # 轉做 default tier（唔會行 exception fallback，唔會浪費一個 round-trip）。
+    "pplx": _call_pplx,       # legacy name, kept for compatibility
+    # note: the classifier still emits "pro"/"premium"/"video" classes → no key here → do_POST
+    # switches straight to the default tier (no exception fallback, no wasted round-trip).
 }
 
 class RouterHandler(BaseHTTPRequestHandler):
@@ -577,7 +656,7 @@ class RouterHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         # Minimal health endpoint for start scripts / cron keepalive.
-        # tier_models = 一眼睇晒邊個 tier 用邊個 model（同 chain 順序）。
+        # tier_models = which model each tier uses, in chain order.
         if self.path == "/healthz":
             self._json(200, {"ok": True, "tiers": list(TIERS.keys()),
                              "tier_models": {t: [l["model"] for l in (c.get("chain") or [c])]
@@ -678,14 +757,18 @@ class RouterHandler(BaseHTTPRequestHandler):
             tier_source = "explicit"
 
         # ── FACTUAL GUARD: real-world facts never go to the local 4B ──────
-        # A 4B cannot know facts and will invent them (audit: "香港人口大約幾多？" -> local).
+        # A 4B cannot know facts and will invent them (audit: a "what is Hong Kong's population?" question -> local).
         # Short factual interrogatives go to flash (capable, cheap). Explicit fact-check
         # wording still escalates to research (paid) through the gate below.
         # Jev decides the two questions the keyword list was guessing at.
         _q_pre = str(query_text).lower()
-        if (_JEV_GUARD_ON and not result_forced_local and not body_tier
-                and tier in ("local", "meta") and _looks_like_question(str(query_text))):
-            jw, jc = _jev_guards(str(query_text)[:1500])
+        _is_q = _looks_like_question(str(query_text))
+        _calc = bool(_PURE_CALC.match(str(query_text)))
+        _jev_ok = (_JEV_GUARD_ON and not result_forced_local and not body_tier)
+        if _jev_ok and tier in ("local", "meta") and _is_q and not _calc:
+            jv = _jev_decide(str(query_text)[:1500], want_len=(tier == "local"), want_guards=True)
+            body["_jev"] = jv            # the same call also caps the local answer
+            jw, jc = jv.get("wk"), jv.get("cit")
             if jw is None and jc is None:
                 _STATS["jev_fail"] += 1
             else:
@@ -698,6 +781,15 @@ class RouterHandler(BaseHTTPRequestHandler):
                 if (jc or 0) > 0.7:
                     tier, confidence, tier_source = "research", max(confidence, 0.85), "guard:jev_citations"
                     guard_hits.append("jev:needs_citations")
+        elif _jev_ok and tier == "local" and not _calc:
+            # Not question-shaped, but the local answer still needs a length cap -> one Jev call,
+            # no guard questions.
+            body["_jev"] = _jev_decide(str(query_text)[:1500], want_len=True, want_guards=False)
+        elif _calc:
+            # Pure arithmetic: the answer is one line by construction, so neither question needs a
+            # cloud round-trip. Keep it entirely local, free, and instant.
+            body["_jev"] = {"len": "one-line"}
+            guard_hits.append("pure_calc:no_escalation")
 
         FACTUAL_Q = (
             r"幾多|幾時|邊年|哪年|哪一年|幾錢|價格|人口|邊個係|係邊個",
@@ -718,14 +810,14 @@ class RouterHandler(BaseHTTPRequestHandler):
             tier_source = "guard:factual_regex"   # fallback path: Jev was unavailable/not run
             guard_hits.append("factual_regex")
 
-        # ── RESEARCH GATE（Perplexity）─────────────────────────────────────
-        # 每次 call 都有 search-context floor（約 $0.005–0.014），所以 gate 要準：
-        #  ① 明確指定：body.tier / x-tier = research（舊名 pplx 照收）→ 直接去。
-        #  ② 自動 hint：只有（a）classifier 原本會用「付費 opencode tier」，而且
-        #     （b）命中「核實具體事實」或「要即時／最新資料」嘅具體字眼，或者
-        #     （c）係長篇判斷／比較題（中文 >120 字或英文 >40 詞），才 hijack。
-        #  ③ Coding／寫作／翻譯／本地文件總結 一律唔觸發（CODING_EXEMPT 豁免）。
-        # 舊版用 substring "analy" + "review" 太闊 → 連 code review 都送 Perplexity 燒錢。
+        # ── RESEARCH GATE (Perplexity) ────────────────────
+        # every call carries a search-context floor (~$0.005–0.014), so the gate must be precise:
+        #  (1) explicit: body.tier / x-tier = research (the old name pplx is still accepted) → go straight there.
+        #  (2) automatic hint: hijack only when (a) the classifier would use a paid opencode tier, and
+        #      (b) the text hits a "verify a specific fact" or "needs live/latest data" phrase, or
+        #      (c) it is a long judgement/comparison question (>120 CJK chars or >40 English words).
+        #  (3) coding / writing / translation / local-document summarisation never triggers it (CODING_EXEMPT).
+        # the old version matched the substrings "analy" + "review", far too broad → even code review paid for Perplexity.
         FACT_PATTERNS = (
             r"\bfact[- ]?check\b", r"\bverify\b", r"\bis (it|this) true\b",
             r"求證", r"核實", r"查證", r"是否屬實", r"有冇根據", r"係咪真",
@@ -746,8 +838,8 @@ class RouterHandler(BaseHTTPRequestHandler):
         hit_judge = ((_words > 40 or _zh > 120)
                      and any(re.search(p, q) for p in JUDGEMENT_PATTERNS)
                      and not any(k in q for k in CODING_EXEMPT))
-        # 安全次序：forced-local（私密）永遠最大聲 —— 連明確指定 research 都唔准搶，
-        # 否則 PII 會經 Perplexity 出街。
+        # safety order: forced-local (private) always wins — even an explicit research request
+        # cannot override it, otherwise PII would leave through Perplexity.
         if result_forced_local:
             pass
         elif body_tier in ("research", "pplx"):
@@ -755,14 +847,14 @@ class RouterHandler(BaseHTTPRequestHandler):
             confidence = 1.0
         elif not body_tier and (
                 (tier in ("pro", "premium", "flash") and (hit_fact or hit_judge))
-                # 明確核實／要即時資料嘅字眼，連 classifier 判 local 都搶：本機 4B 根本
-                # 核實唔到事實，會直接作答案。判斷類（長度啟發）就唔搶 local。
+                # explicit verification / live-data wording overrides even a local classification:
+                # a local 4B cannot verify facts and invents them; length-heuristic judgement queries do not override local.
                 or (tier == "local" and hit_fact)):
             tier = "research"
             confidence = max(confidence, 0.7)
 
         # ── DEV-TASK GUARD: the 3 modality flags are crude keyword matches, so an
-        # audio/video-flavoured CODING request ("ffmpeg 抽音軌", "SRT 對齊") was classified
+        # audio/video-flavoured CODING request ("ffmpeg extract audio track", "SRT align") was classified
         # voice/video and got back the TTS placeholder instead of an answer (or a 502 when
         # the handler signature broke). Dev markers win: those tiers cannot answer them.
         dev_kw = ("python", "script", "code", "function", "sql", "regex", "ffmpeg", "srt",
@@ -793,12 +885,12 @@ class RouterHandler(BaseHTTPRequestHandler):
         # Dispatch
         handler = DISPATCH.get(tier)
         if handler is None:
-            tier = "flash"  # fallback（例如 classifier 出 "video"：已刪 tier，去 default）
+            tier = "flash"  # fallback (e.g. a "video" class: that tier was removed, so use default)
             handler = _call_chain
 
         # ── VRAM gate for local tier ──
         # Only matters when the model is NOT resident yet (first local request
-        # after boot / after the 30m keep-alive expired). If a game is hogging
+        # after boot / after the 30m keep-alive expired). If another GPU workload is
         # VRAM at that moment, loading local would silently CPU-run (slow) or
         # OOM. Fail-closed for forced-local; degrade to flash for ordinary local.
         if tier == "local" and not _local_model_loaded():
@@ -818,7 +910,7 @@ class RouterHandler(BaseHTTPRequestHandler):
                 handler = _call_chain
 
         try:
-            body["_forced_local"] = result_forced_local   # 令 _call_ollama 知唔可以交俾 Jev（雲端）
+            body["_forced_local"] = result_forced_local   # tells _call_ollama it must not hand this to Jev (cloud)
             result = handler(body, tier)
         except Exception as e:
             # If tier fails, try flash as fallback — EXCEPT forced-local:
@@ -832,7 +924,7 @@ class RouterHandler(BaseHTTPRequestHandler):
                 return self._json(502, {"error": f"{tier}: {e}, flash fallback: {e2}"})
 
         result["x-route"] = tier
-        result["x-leg"] = result.get("leg")          # go / zen / nvidia — 月費有冇用到一眼睇
+        result["x-leg"] = result.get("leg")          # go / zen / nvidia — shows at a glance whether the subscription leg was used
         result["x-confidence"] = round(confidence, 3)
         result["x-ms"] = elapsed
         result["x-forced-local"] = result_forced_local

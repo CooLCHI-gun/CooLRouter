@@ -2,7 +2,7 @@
 
 > The implementation is `router/router-proxy.py` (~865 lines, Python stdlib + PyYAML).
 > This document is the structure, the decision chain, and the failure modes — not marketing.
-> Every number below was measured on the reference machine (RTX 3060 6 GB, Windows 11) on 2026-09-23.
+> Every number below was measured on a 6 GB consumer GPU (Windows 11) on 2026-09-23.
 
 ---
 

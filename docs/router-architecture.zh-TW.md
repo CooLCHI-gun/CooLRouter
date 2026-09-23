@@ -164,7 +164,7 @@ flowchart TD
 | Jev citations | `cit > 0.7` | → `research` | 需要出處／最新資料 |
 | Research hint gate | 精準 fact／verify／recency pattern + 非 coding | → `research` | Perplexity 每次呼叫都有 search-context floor（約 $0.005–0.014），所以 gate 必須窄 |
 | DEV-TASK | `voice`/`video` + dev keyword | → `flash` | 防止「寫 ffmpeg 腳本」被當成語音／影片請求 |
-| VRAM | `local` 且 VRAM > 4500MB | 普通 → `flash`；forced-local → 503 | 6GB 卡上與遊戲共存；私密請求寧願失敗也不外洩 |
+| VRAM | `local` 且 VRAM > 4500MB | 普通 → `flash`；forced-local → 503 | 6GB 卡上與其他 GPU 工作共用；私密請求寧願失敗也不外洩 |
 | Leg cooldown | HTTP 429/402/403 或 quota 字眼 | 該腿停用 900s（其他錯誤 60s） | 額度耗盡時不重複撞牆 |
 
 ---
