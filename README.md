@@ -16,15 +16,7 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 </p>
 
 <p align="center">
-  <img src="assets/tier-routing.gif" alt="CooLRouter — intent→tier routing animation" width="720">
-</p>
-
-<p align="center">
-  <img src="assets/demo.gif" alt="CooLRouter — live agent session, intent-guided tiered execution" width="720">
-</p>
-
-<p align="center">
-  <img src="assets/routing-flow.gif" alt="CooLRouter — one request travelling the decision chain, stopped at the privacy gate" width="720">
+  <img src="assets/demo-routing.gif" alt="CooLRouter — one task travelling the router: decide, dispatch, deliver" width="900">
 </p>
 
 <p align="center">
@@ -41,7 +33,7 @@ An intent-guided, tiered routing layer for a local-first AI agent — where intu
 </p>
 
 <p align="center">
-  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#repository-layout">Repository</a> · <a href="#limitations">Limitations</a>
+  <a href="#why-coolrouter">Why CooLRouter</a> · <a href="#the-six-tiers">The Six Tiers</a> · <a href="#how-routing-works">How Routing Works</a> · <a href="#the-guardrail">The Guardrail</a> · <a href="#deploy">Deploy</a> · <a href="#repository-layout">Repository</a> · <a href="#limitations">Limitations</a>
 </p>
 
 > **The cheapest model that verifiably does the job is the right model.**
@@ -140,11 +132,24 @@ Each arrangement substitutes a shinier alternative — declined, usually for cos
 - *No heedless automation.* The system runs unattended only where deterministic and low-risk;
   anything with consequence is shown to a human first.
 
+## Deploy
+
+```sh
+cp deploy/.env.example .env     # add only the keys you actually have
+sh deploy/install.sh            # Linux / macOS   (./deploy/install.ps1 on Windows)
+```
+
+One Python file, no third-party dependencies. [`deploy/`](deploy/) carries the wrappers — install
+scripts for both platforms, a `systemd --user` unit, a container path, and the config snippet that
+serves an agent through it. The response carries the routing decision in its body
+(`x-route`, `x-leg`, `x-ms`, `x-guard`, …), so you can always see *why* a request went where it went.
+
 ## Repository layout
 
 ```
 .
-├── assets/        architecture.svg · router-decision-chain.svg · demo.gif · routing-flow.gif · social.mp4 · promo.mp4 · og-image.png
+├── assets/        demo-routing.gif (3-act demo) · architecture.svg · router-decision-chain.svg · social.mp4 · promo.mp4 · og-image.png
+├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes config + plugin
 ├── config/        environment config sample (values redacted, shape kept)
 ├── router/        router-proxy.py — the routing core · router-conformance.py · test-router-p0.py
 ├── skills/        sample skill entries — the pattern, not the content
@@ -154,10 +159,10 @@ Each arrangement substitutes a shinier alternative — declined, usually for cos
 └── LICENSE        MIT
 ```
 
-The animated assets are generated: `demo.gif` (terminal session), `social.mp4` (7s loop),
-`promo.mp4` (12s Remotion cinematic), `architecture.svg` (6-tier diagram). Their generators live
-in `assets/_gen_*.py` and are gitignored — the source for `promo.mp4` is the full Remotion project
-under `promo/`.
+The animated assets are generated: `demo-routing.gif` (20 frames, 12.4s — one task travelling
+decide → dispatch → deliver), `social.mp4` (7s loop), `promo.mp4` (12s Remotion cinematic),
+`architecture.svg` (6-tier diagram). Their generators live in `assets/_gen_*.py` and are
+gitignored — the source for `promo.mp4` is the full Remotion project under `promo/`.
 
 ## Limitations
 

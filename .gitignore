@@ -10,3 +10,7 @@ assets/_logo_preview.html
 assets/_gen_decision_chain.py
 assets/_gen_routing_gif.py
 assets/muse-spec.json
+assets/_gen_demo_gif.py
+assets/muse-demo-spec.json
+__pycache__/
+*.pid

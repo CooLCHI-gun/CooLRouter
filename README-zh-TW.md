@@ -26,11 +26,11 @@
 </p>
 
 <p align="center">
-  <img src="assets/routing-flow.gif" alt="CooLRouter —— 一個請求走過決策鏈，並在 privacy gate 被攔下" width="720">
+  <img src="assets/demo-routing.gif" alt="CooLRouter —— 一個任務走過路由器：decide、dispatch、deliver" width="900">
 </p>
 
 <p align="center">
-  <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#防護機制">防護機制</a> · <a href="#目錄結構">目錄結構</a> · <a href="#限制說明">限制</a>
+  <a href="#為何需要-coolrouter">為何需要</a> · <a href="#六個等級">六個等級</a> · <a href="#路由如何運作">路由機制</a> · <a href="#防護機制">防護機制</a> · <a href="#部署">部署</a> · <a href="#目錄結構">目錄結構</a> · <a href="#限制說明">限制</a>
 </p>
 
 > **能以最低成本完成任務、且經得起驗證的模型，就是正確的模型。**
@@ -98,11 +98,25 @@
 - *不「讓位給最大模型」。* 那通常是最貴的途徑，也很少是最合適的。
 - *不盲目自動化。* 系統只在確定性高且風險低的工作上無人運行；凡具實質後果的工作，一律先由人類檢視。
 
+## 部署
+
+```sh
+cp deploy/.env.example .env     # 只填入你實際持有的 key
+sh deploy/install.sh            # Linux / macOS（Windows 用 ./deploy/install.ps1）
+```
+
+路由核心是單一 Python 檔案，沒有任何第三方依賴，因此「部署」等同「執行它」。[`deploy/`](deploy/)
+收錄各種包裝：兩個平台的安裝腳本、`systemd --user` unit、容器路徑，以及把 agent 接到它上面的設定片段。
+
+回應會把路由決策一併帶回（`x-route`、`x-leg`、`x-ms`、`x-guard` 等，位於回應 body 的頂層欄位），
+因此每個請求「為何被送往該處」都有跡可循。完整契約見 [`docs/router-architecture.zh-TW.md`](docs/router-architecture.zh-TW.md)。
+
 ## 目錄結構
 
 ```
 .
-├── assets/        架構圖 · 動畫演示 · 社交影片 · 標誌
+├── assets/        demo-routing.gif（三幕演示）· 架構圖 · 決策鏈圖 · 社交影片 · 標誌
+├── deploy/        install.sh · install.ps1 · Dockerfile · compose · systemd unit · Hermes 設定與 plugin
 ├── config/        環境配置範例（數值已遮蔽，保留結構）
 ├── router/        router-proxy.py —— 路由核心，附說明與測試
 ├── skills/        技能條目範例——呈現模式，非實際內容
@@ -112,7 +126,7 @@
 └── LICENSE        MIT
 ```
 
-動畫素材皆為程式生成：`demo.gif`（終端員工作階段）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）、`routing-flow.gif`（8 幀路由流程動畫）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）。；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
+動畫素材皆為程式生成：`demo-routing.gif`（20 幀、12.4 秒，示範一個任務走過 decide → dispatch → deliver）、`social.mp4`（7 秒循環）、`promo.mp4`（12 秒 Remotion 電影式宣傳）、`architecture.svg`（六級架構圖）、`router-decision-chain.svg`（決策鏈圖，依設計規格生成）。生成器位於 `assets/_gen_*.py`（已加入 .gitignore）；`promo.mp4` 的原始碼是完整的 Remotion 專案，位於 `promo/`。
 
 ## 限制說明
 

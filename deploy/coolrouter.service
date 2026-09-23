@@ -1,0 +1,18 @@
+[Unit]
+Description=CooLRouter — local-first tiered routing proxy
+Documentation=https://github.com/CooLCHI-gun/CooLRouter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@RUN@
+ExecStart=/usr/bin/env python3 -u router-proxy.py @PORT@
+Restart=on-failure
+RestartSec=5
+# The router holds no state worth preserving across a restart; the trace log is append-only.
+StandardOutput=append:@RUN@/logs/router.log
+StandardError=append:@RUN@/logs/router.log
+
+[Install]
+WantedBy=default.target

@@ -6,7 +6,20 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from memory_enhancer import route_query
+try:
+    from memory_enhancer import route_query      # optional: trained intent classifier
+except Exception:                                # absent in a standalone checkout
+    def route_query(text, *args, **kwargs):
+        """Deterministic stand-in for the trained classifier.
+
+        The published core must run with no local modules present. Shape-based routing keeps the
+        cheap shapes cheap; every guard downstream still runs, so privacy and typed decisions are
+        unaffected. With the classifier installed this branch is never taken.
+        """
+        t = (text or "").strip()
+        if t and _PURE_CALC.search(t):
+            return "local", 0.4          # arithmetic never needs a frontier model
+        return "flash", 0.5
 
 # Load .router-env for API keys
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".router-env")
@@ -46,7 +59,10 @@ LOCAL_VRAM_USED_MAX_MB = 4500
 # entire Jev token cap inside its "Thinking Process:" preamble: the local model with cap 320 emitted
 # 912 chars of CoT, done_reason=length, i.e. ZERO answer. gemma3:4b answers the same prompt in
 # 1.6 s / 60 tokens / done=stop. The cap only works on a model that does not think out loud.
-_LOCAL_MODEL_NAME = "gemma3:4b"
+_LOCAL_MODEL_NAME        = os.environ.get("ROUTER_LOCAL_MODEL", "gemma3:4b")
+# The local engine is an OpenAI-compatible Ollama endpoint. Configurable so the published core can
+# run beside the engine instead of on it (a container, another host) without editing source.
+_OLLAMA_URL              = os.environ.get("ROUTER_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 # Local VISION model. gemma3:4b is itself multimodal (Ollama reports capabilities
 # ["completion","vision"]), but the dedicated VL distill is the one measured correct on image
 # questions (11/11, 0.4 s), so image traffic on the local tier uses it. Env-overridable so a
@@ -236,7 +252,7 @@ def _looks_like_question(text: str) -> bool:
 
 def _ollama_up() -> bool:
     try:
-        urlopen("http://127.0.0.1:11434/api/tags", timeout=3).read()
+        urlopen(_OLLAMA_URL + "/api/tags", timeout=3).read()
         return True
     except Exception:
         return False
@@ -245,7 +261,7 @@ def _local_model_loaded(name: str = "") -> bool:
     """True when that local model is already resident in Ollama (the VRAM gate is about
     *loading* under contention — a resident model is fine even if VRAM is full)."""
     try:
-        out = urlopen("http://127.0.0.1:11434/api/ps", timeout=5).read()
+        out = urlopen(_OLLAMA_URL + "/api/ps", timeout=5).read()
         return (name or _LOCAL_MODEL_NAME).encode() in out
     except Exception:
         return False
@@ -266,7 +282,7 @@ _ZEN_FLASH = _leg(_OC_ZEN, "deepseek-v4.1-flash", "OPENCODE_ZEN_API_KEY")
 TIERS = {
     # (1) PRIVATE-FIRST — local 4B. private/PII traffic is fail-closed and never goes to the cloud.
     "local": {
-        "url": "http://127.0.0.1:11434/api/generate",
+        "url": _OLLAMA_URL + "/api/generate",
         "model": _LOCAL_MODEL_NAME,
         "provider": "ollama",
         "note": "private-first；non-thinking instruct（cap 才有效）；VRAM 緊張時普通請求降 flash，forced-local fail-closed",

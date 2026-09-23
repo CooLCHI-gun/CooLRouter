@@ -1,0 +1,23 @@
+# Wiring CooLRouter into Hermes Agent.
+#
+# The router speaks the OpenAI chat-completions API, so it is added as an ordinary provider —
+# no plugin and no code change are needed. Paste this under the top level of config.yaml
+# (~/.hermes/config.yaml), then point the model you want at it.
+#
+#   hermes config get providers                     # inspect what is already configured
+#   hermes config set model.default coolrouter/deepseek-v4.1-flash
+#
+# api_key is a placeholder: the router authenticates nothing locally, but the client must send
+# some non-empty value.
+
+providers:
+  coolrouter:
+    base_url: http://127.0.0.1:8000/v1
+    api_key: local
+    models:
+      - deepseek-v4.1-flash      # the router maps the requested name onto the chosen leg
+
+# Optional: keep your cloud provider as the fallback, so a router outage is not an outage.
+fallback_providers:
+  - provider: <your-cloud-provider>
+    model: <your-cloud-model>

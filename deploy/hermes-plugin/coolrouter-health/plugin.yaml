@@ -1,0 +1,7 @@
+name: coolrouter-health
+version: 1.0.0
+description: "Observer-only: logs a warning when a local-first router on :8000 is unreachable, so a silent fall back to cloud is visible."
+author: "CooLRouter"
+kind: standalone
+hooks:
+  - pre_llm_call
