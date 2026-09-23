@@ -250,6 +250,50 @@ def _looks_like_question(text: str) -> bool:
         t, re.I))
 
 
+def _gpu_pressure_mb() -> int:
+    """VRAM held by something OTHER than Ollama's own resident models.
+
+    The VRAM gate exists to avoid loading a local model while ANOTHER GPU workload (a game, a video
+    render) holds the card — loading then silently CPU-runs. Ollama, however, evicts its OWN models
+    on demand (measured 2026-09-23: gemma3 was evicted the moment the vision model loaded), so VRAM
+    held by Ollama's own models is NOT pressure. Counting it blocked ordinary local traffic for as
+    long as any other local model stayed resident: gemma3 (2.79GB) + the always-resident embedding
+    model (2.15GB) = 4.94GB > the 4500MB threshold, so the FIRST local request after an idle period
+    was sent to the cloud even with an idle GPU.
+    """
+    used = _gpu_vram_used_mb()
+    if used is None or used < 0:
+        return -1
+    try:
+        d = json.loads(urlopen(_OLLAMA_URL + "/api/ps", timeout=5).read())
+        own = sum(m.get("size_vram", 0) for m in (d.get("models") or [])) / (1024 * 1024)
+        return max(0, int(used - own))
+    except Exception:
+        return used          # cannot tell -> behave exactly as before
+
+
+def _local_gpu_state() -> dict:
+    """Are the resident local models actually IN VRAM?
+
+    Measured 2026-09-23: an `ollama serve` started before the GPU/driver was ready enumerates no GPU
+    and then runs CPU-only for its entire lifetime — 8.2 tok/s instead of 58.4, with no error in any
+    log. Two consequences worth surfacing: the local tier is ~7x slow, and `gpu_vram_used_mb: 0`
+    silently DISABLES the VRAM gate (0 reads identically to "no GPU pressure"). So report residency
+    explicitly instead of leaving the tell hidden in `/api/ps`.
+    """
+    try:
+        d = json.loads(urlopen(_OLLAMA_URL + "/api/ps", timeout=5).read())
+        ms = d.get("models") or []
+        vram = sum(m.get("size_vram", 0) for m in ms)
+        return {"local_models_resident": len(ms),
+                "local_vram_gb": round(vram / 1e9, 2),
+                # models resident but none of them in VRAM => CPU-only server
+                "local_gpu_ok": (not ms) or vram > 0}
+    except Exception as e:
+        return {"local_models_resident": None, "local_vram_gb": None,
+                "local_gpu_ok": None, "local_gpu_error": str(e)[:80]}
+
+
 def _ollama_up() -> bool:
     try:
         urlopen(_OLLAMA_URL + "/api/tags", timeout=3).read()
@@ -509,6 +553,30 @@ def _strip_think(content: str):
     return content, True
 
 
+_ROLE_LABEL = {"system": "System", "user": "User", "assistant": "Assistant", "tool": "Tool"}
+
+
+def _flatten_messages(msgs) -> str:
+    """Join the whole conversation into the single prompt string /api/generate expects.
+
+    Sending only the final message silently dropped the system prompt and every earlier turn:
+    measured 2026-09-23, a request carrying a ~2,555-token system prompt reached the model as a
+    16-token prompt, so the local tier answered with no instructions and no history. The cloud
+    legs never had this problem - they forward the messages array untouched.
+    """
+    out = []
+    for m in msgs or []:
+        if not isinstance(m, dict):
+            continue
+        content = m.get("content")
+        if not isinstance(content, str):
+            content, _ = _split_multimodal(m)
+        content = (content or "").strip()
+        if content:
+            out.append("%s: %s" % (_ROLE_LABEL.get(m.get("role"), "User"), content))
+    return "\n\n".join(out)
+
+
 def _call_ollama(payload: dict, tier: str) -> dict:
     """Call Ollama /api/generate. Handles thinking field for reasoning models.
 
@@ -526,6 +594,10 @@ def _call_ollama(payload: dict, tier: str) -> dict:
             # empty prompt (an empty prompt made a vision model answer about nothing).
             text = json.dumps([p for p in last_msg if isinstance(p, dict) and p.get("type") == "text"]
                               or last_msg)[:2000]
+    # The whole conversation goes to the model. /api/generate takes ONE prompt string, so it has to
+    # be flattened here; the length decision below still looks at the final turn only, because that
+    # is what the caller is asking for.
+    prompt_text = _flatten_messages(payload.get("messages")) or text
     model = _local_model_for(payload)
     if payload.get("max_tokens"):
         npred, len_class = int(payload["max_tokens"]), "caller"
@@ -540,7 +612,7 @@ def _call_ollama(payload: dict, tier: str) -> dict:
     npred = max(npred, 160)
     llm_payload = {
         "model": model,
-        "prompt": text,
+        "prompt": prompt_text,
         **({"images": images} if images else {}),
         "stream": False,
         "keep_alive": "3m",  # 3m: VRAM frees when idle. Was 30m — that plus the 6-min keepalive
@@ -751,6 +823,7 @@ class RouterHandler(BaseHTTPRequestHandler):
                              "local_model": _LOCAL_MODEL_NAME,
                              "gpu_vram_used_mb": _gpu_vram_used_mb(),
                              "gpu_vram_error": _VRAM_ERR,
+                             **_local_gpu_state(),
                              "stats": _health_stats()})
         else:
             self._json(404, {"error": "not found"})
@@ -996,7 +1069,7 @@ class RouterHandler(BaseHTTPRequestHandler):
         # exists to prevent. Measured 2026-09-23: with a text model resident (VRAM 5902 MB > 4500)
         # `tier=local` + image was degraded to flash, i.e. straight back to a text model.
         if tier == "local" and not _img_req and not _local_model_loaded(_local_model_for(body)):
-            vram = _gpu_vram_used_mb()
+            vram = _gpu_pressure_mb()          # exclude Ollama's own evictable models
             if vram > LOCAL_VRAM_USED_MAX_MB:
                 if result_forced_local:
                     # Make the error actionable: the usual cause is a STALE local model holding
