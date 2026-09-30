@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ponytail Router v2 — 8-tier multi-destination router. Replaces centroid."""
+"""Ponytail Router — one request, one tier, six engines (local, flash, meta, vision, voice, research). Replaces centroid."""
 import hashlib, json, os, re, shutil, sys, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.request import Request, urlopen
@@ -55,6 +55,26 @@ if os.path.exists(_env_profile):
 # back to CPU (slow). Fail-closed for forced-local (private) traffic; for
 # ordinary local-classified queries, degrade to flash instead.
 LOCAL_VRAM_USED_MAX_MB = 4500
+
+# ── local context window (added 2026-09-29) ─────────────────────────
+# The router has NEVER set num_ctx, so the local leg runs on Ollama's default 2048 and everything
+# longer is TRUNCATED SILENTLY: the model answers without having seen the whole prompt, and every
+# downstream check treats that answer as real. Measured evidence: the largest prompt_tokens this
+# router ever recorded on the local leg was 2051 - i.e. it was pinned at the ceiling, not under it.
+# Fixing it by raising num_ctx is NOT an option here (6 GB card: the KV cache spills to CPU).
+# So: do not route a prompt that cannot fit to the local leg at all.
+LOCAL_NUM_CTX = 2048
+LOCAL_OUTPUT_RESERVE = 512          # the answer has to live in the same window
+LOCAL_PROMPT_MAX_TOKENS = LOCAL_NUM_CTX - LOCAL_OUTPUT_RESERVE
+
+
+def _est_tokens(text: str) -> int:
+    """Conservative prompt-token estimate. Latin runs ~4 chars/token, CJK closer to 1.5-2, so
+    divide by 3 and pad 15%. Overestimating costs one paid call; underestimating ships a silently
+    truncated answer, so the error is deliberately asymmetric."""
+    if not text:
+        return 0
+    return int(len(text) / 3 * 1.15) + 8
 # LOCAL MODEL = NON-THINKING INSTRUCT (measured 2026-09-22). A reasoning distill spends the
 # entire Jev token cap inside its "Thinking Process:" preamble: the local model with cap 320 emitted
 # 912 chars of CoT, done_reason=length, i.e. ZERO answer. gemma3:4b answers the same prompt in
@@ -370,12 +390,12 @@ TIERS = {
     # (7) RESEARCH — Perplexity. Every call carries a search-context floor (~$0.005–0.014), so it
     #    opens only when live external data or fact verification is genuinely needed (see the do_POST gate).
     "research": {
-        "url": "https://api.perplexity.ai/chat/completions",
-        "model": "sonar-pro",
-        "reason_model": "sonar-reasoning-pro",
+        "agent_url": "https://api.perplexity.ai/v1/agent",      # 唯一路徑：Perplexity Agent API
+        "preset": "medium",                                     # 失敗／回空會自動試 low → high
+        "model": "agent:medium",                                # 只作顯示；實際模型由 preset 決定
         "api_key_env": "PERPLEXITY_API_KEY",
         "provider": "perplexity",
-        "note": "sonar-pro 預設（平、有 citation）；判斷／長查詢升 sonar-reasoning-pro",
+        "note": "Agent API preset medium（≈舊 Sonar Reasoning Pro）。2026-09-24 遷移；Sonar chat 已退役",
     },
 }
 # note: the "video" tier was removed (2026-09-20). Video analysis needs the built-in Hermes
@@ -626,6 +646,14 @@ def _call_ollama(payload: dict, tier: str) -> dict:
                   {"Content-Type": "application/json"})
     resp = json.loads(urlopen(req, timeout=180).read())  # 180s: cold-start headroom
     content = resp.get("response", "") or resp.get("thinking", "") or ""
+    pec = int(resp.get("prompt_eval_count") or 0)
+    # Ollama reports how much of the prompt it actually evaluated. If that sits at the window it
+    # truncated - and it will not say so anywhere else. Loud, because an answer built on an unseen
+    # prompt is indistinguishable from a correct one.
+    truncated = pec >= LOCAL_NUM_CTX - 8
+    if truncated:
+        print("[TRUNCATED] local leg evaluated %d/%d prompt tokens (model=%s) - the answer did NOT "
+              "see the whole prompt" % (pec, LOCAL_NUM_CTX, model), flush=True)
     content, think_stripped = _strip_think(content)
     return {"choices": [{"message": {"role": "assistant", "content": content},
                          "finish_reason": "stop"}],
@@ -633,6 +661,7 @@ def _call_ollama(payload: dict, tier: str) -> dict:
             "x-local-vision": bool(images),
             "x-len-class": len_class, "x-num-predict": npred,
             "x-think-stripped": think_stripped,
+            "x-truncated": truncated, "x-prompt-eval-count": pec,
             "x-done": resp.get("done_reason"),
             "usage": {"prompt_tokens": resp.get("prompt_eval_count"),
                       "completion_tokens": resp.get("eval_count"),
@@ -769,6 +798,35 @@ def _pplx_once(cfg: dict, key: str, payload: dict, model: str, max_tokens: int):
     msg = resp["choices"][0]["message"]
     return (msg.get("content") or msg.get("reasoning_content") or "").strip(), resp
 
+def _pplx_agent(cfg: dict, key: str, text: str, preset: str = "medium"):
+    """Agent API（POST /v1/agent）——Sonar chat/completions 2026-09-27 退役後嘅主路。
+    回 (content, resp)；回應係 typed output array（message / search_results …）。"""
+    url = cfg.get("agent_url", "https://api.perplexity.ai/v1/agent")
+    req = Request(url, json.dumps({"preset": preset, "input": text}).encode(),
+                  {"Content-Type": "application/json", "Authorization": "Bearer " + key})
+    resp = json.loads(urlopen(req, timeout=300).read())
+    out, cites = "", []
+    for item in (resp.get("output") or []):
+        if not isinstance(item, dict):
+            continue
+        for c in (item.get("content") or []):
+            if isinstance(c, dict) and c.get("type") in ("output_text", "text"):
+                out += c.get("text", "") or ""
+        for k in ("results", "search_results", "sources"):
+            for r in (item.get(k) or []):
+                if isinstance(r, dict) and r.get("url"):
+                    cites.append(r["url"])
+    for c in (resp.get("citations") or []):
+        if isinstance(c, str) and c not in cites:
+            cites.append(c)
+    seen, uniq = set(), []
+    for c in cites:
+        if c not in seen:
+            seen.add(c); uniq.append(c)
+    return out.strip(), {"usage": resp.get("usage", {}), "citations": uniq,
+                         "model": resp.get("model") or ("preset:" + preset)}
+
+
 def _call_pplx(payload: dict, tier: str = "research") -> dict:
     """Call Perplexity Sonar (OpenAI-compatible) + citations. Never returns empty silently."""
     cfg = TIERS.get(tier) or TIERS["research"]
@@ -776,22 +834,23 @@ def _call_pplx(payload: dict, tier: str = "research") -> dict:
     if not key:
         raise ValueError("PERPLEXITY_API_KEY not set")
     text = str(payload.get("messages", [{}])[-1].get("content", ""))
-    model = _pick_pplx_model(cfg, text)
-    floor = 4096 if "reasoning" in model else 2048
-    content, resp = _pplx_once(cfg, key, payload, model, floor)
-    if not content:
-        content, resp = _pplx_once(cfg, key, payload, model, 8192)
-        model += "(retry-fat-cap)"
-    if not content:
-        content, resp = _pplx_once(cfg, key, payload, cfg["model"], 2048)
-        model = cfg["model"] + "(degraded)"
-    out = {"choices": [{"message": {"role": "assistant", "content": content},
-                        "finish_reason": "stop"}],
-           "usage": resp.get("usage", {}),
-           "model": model}
-    if resp.get("citations"):
-        out["citations"] = resp["citations"]
-    return out
+    # Agent API 唯一路徑（2026-09-25；Sonar chat 已退役）。失敗或回空 → 換 preset 再試。
+    presets = [cfg.get("preset", "medium"), "low", "high"]
+    last = None
+    for _p in presets:
+        try:
+            _c, _r = _pplx_agent(cfg, key, text, _p)
+        except Exception as _e:
+            last = _e
+            continue
+        if _c:
+            _o = {"choices": [{"message": {"role": "assistant", "content": _c},
+                               "finish_reason": "stop"}],
+                  "usage": _r.get("usage", {}), "model": _r.get("model")}
+            if _r.get("citations"):
+                _o["citations"] = _r["citations"]
+            return _o
+    raise RuntimeError("Agent API 全部 preset 失敗或回空（last=%r）" % (last,))
 
 DISPATCH = {
     "local": _call_ollama,
@@ -1086,6 +1145,26 @@ class RouterHandler(BaseHTTPRequestHandler):
                 guard_hits.append("vram:%dMB>%dMB" % (vram, LOCAL_VRAM_USED_MAX_MB))
                 handler = _call_chain
 
+        # ── input-length gate for local tier (added 2026-09-29) ──
+        # Same shape as the VRAM gate above, for the same reason: the local leg has a hard limit and
+        # exceeding it degrades the ANSWER rather than failing, which nothing downstream can detect.
+        # Ordinary local traffic downgrades to flash (a correct paid answer beats a truncated free
+        # one). Forced-local (private/PII) is the one case that must NOT move: there the alternative
+        # is a cloud leak, so it stays local and the truncation is reported instead of hidden.
+        if tier == "local":
+            est = _est_tokens(_flatten_messages(body.get("messages")))
+            if est > LOCAL_PROMPT_MAX_TOKENS:
+                if result_forced_local:
+                    guard_hits.append("len:forced-local:%d>%d" % (est, LOCAL_PROMPT_MAX_TOKENS))
+                    print("[TRUNCATED] forced-local prompt ~%d tokens > local window %d - Ollama "
+                          "will truncate this PRIVATE request (no cloud fallback by design)"
+                          % (est, LOCAL_NUM_CTX), flush=True)
+                else:
+                    tier = "flash"
+                    tier_source = "guard:prompt_len"
+                    guard_hits.append("len:%d>%d" % (est, LOCAL_PROMPT_MAX_TOKENS))
+                    handler = _call_chain
+
         try:
             body["_forced_local"] = result_forced_local   # tells _call_ollama it must not hand this to Jev (cloud)
             result = handler(body, tier)
@@ -1128,7 +1207,9 @@ class RouterHandler(BaseHTTPRequestHandler):
                 "model": result.get("model"), "ms_total": total_ms, "classify_ms": elapsed,
                 "conf": round(confidence, 3), "source": tier_source,
                 "forced_local": result_forced_local, "pinned_from": pinned_from,
-                "guard": guard_hits, "len_class": result.get("x-len-class"), **cinfo})
+                "guard": guard_hits, "len_class": result.get("x-len-class"),
+                "truncated": result.get("x-truncated"), "done": result.get("x-done"),
+                **cinfo})
         self._json(200, result)
 
 if __name__ == "__main__":

@@ -39,10 +39,28 @@ check("pure arithmetic stays local", lambda: (
     (lambda d, _: (d.get("x-route") == "local" and "pure_calc" in str(d.get("x-guard")),
                    "route=%s guard=%s" % (d.get("x-route"), d.get("x-guard"))))(*call("what is 2+2"))))
 
-check("secret is forced local", lambda: (
-    (lambda d, _: (d.get("x-forced-local") is True and d.get("x-route") == "local",
-                   "route=%s forced=%s" % (d.get("x-route"), d.get("x-forced-local"))))(
-        *call("my api key is sk-test-1234567890, please redact it"))))
+def _private():
+    """The invariant is "never leaves the box", NOT "always answers".
+
+    A fail-closed 503 under genuine GPU pressure satisfies it (the request was refused rather
+    than sent to the cloud), so both outcomes pass and a cloud route fails either way. Asserting
+    a 200 specifically would make this row depend on the machine's free VRAM.
+    """
+    st = 200
+    try:
+        d, _ = call("my api key is sk-test-1234567890, please redact it")
+    except urllib.error.HTTPError as e:
+        st = e.code
+        try:
+            d = json.loads(e.read().decode())
+        except Exception:
+            d = {}
+    ok = (d.get("x-route") == "local" and d.get("x-forced-local") is True and st in (200, 503))
+    detail = "route=" + str(d.get("x-route")) + " forced=" + str(d.get("x-forced-local")) + " status=" + str(st)
+    return ok, detail
+
+
+check("secret is forced local (never cloud)", _private)
 
 
 def _fact():
@@ -139,10 +157,13 @@ check("image + private -> forced local", _vision_private)
 
 def _hz():
     h = json.loads(urllib.request.urlopen(BASE + "/healthz", timeout=10).read())
+    # local_gpu_ok must be present: it is the field that catches an ollama serve which enumerated
+    # no GPU at boot and has been running CPU-only (7x slow) ever since.
     return (h.get("ok") is True and h.get("ollama_up") is True and len(h.get("tiers", [])) >= 6
-            and "jev_calls" in (h.get("stats") or {})), \
-        "tiers=%d vram=%s jev_calls=%s" % (len(h.get("tiers", [])), h.get("gpu_vram_used_mb"),
-                                           (h.get("stats") or {}).get("jev_calls"))
+            and "jev_calls" in (h.get("stats") or {}) and "local_gpu_ok" in h), \
+        "tiers=%d vram=%s gpu_ok=%s jev_calls=%s" % (len(h.get("tiers", [])),
+                                                     h.get("gpu_vram_used_mb"), h.get("local_gpu_ok"),
+                                                     (h.get("stats") or {}).get("jev_calls"))
 
 
 check("healthz shape + counters", _hz)
